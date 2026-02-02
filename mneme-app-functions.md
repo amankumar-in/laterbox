@@ -2,7 +2,7 @@
 
 I want to build a chat app that will act as an idea, quick note dump.
 
-Clone of whatsapp in terms of design. Homepage has a contact list and a search. Filter chips All, and Tasks. Instead of green, we will use blue for accent.
+Similar to whatsapp in terms of design. Homepage has a contact list and a search. Filter chips All, and Tasks. Instead of green, we will use blue for accent.
 
 Plus float button on home \- click on it to start a new chat.
 
