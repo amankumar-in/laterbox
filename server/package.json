@@ -7,9 +7,12 @@
     "start": "node index.js"
   },
   "dependencies": {
+    "axios": "^1.13.4",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "mongoose": "^8.0.0",
+    "react-native-country-picker-modal": "^2.0.0",
+    "twilio": "^5.12.0",
     "uuid": "^10.0.0"
   }
 }

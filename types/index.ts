@@ -1,6 +1,16 @@
 export type MessageType = 'text' | 'image' | 'voice' | 'file' | 'location'
 
-export interface Chat {
+// Re-export local database types for components that need them
+export type {
+  ChatWithLastMessage,
+  MessageWithDetails,
+  UserProfile,
+  SyncStatus,
+  TaskFilter,
+} from '@/services/database/types'
+
+// Legacy server types (used by sync service and API compatibility)
+export interface ServerChat {
   _id: string
   name: string
   icon?: string
@@ -18,10 +28,10 @@ export interface Chat {
   updatedAt: string
 }
 
-export interface Message {
+export interface ServerMessage {
   _id: string
   chatId: string
-  chatName?: string // Populated by API when fetching tasks
+  chatName?: string
   senderId: string
   content?: string
   type: MessageType
@@ -54,7 +64,7 @@ export interface Message {
   updatedAt: string
 }
 
-export interface User {
+export interface ServerUser {
   _id: string
   deviceId: string
   name: string
@@ -75,5 +85,10 @@ export interface User {
   createdAt: string
   updatedAt: string
 }
+
+// Alias for backward compatibility (components use these)
+export type Chat = ServerChat
+export type Message = ServerMessage
+export type User = ServerUser
 
 export type ChatFilter = 'threads' | 'tasks'

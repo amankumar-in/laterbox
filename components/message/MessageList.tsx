@@ -3,18 +3,18 @@ import { useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 
 import { ActivityIndicator, FlatList } from 'react-native'
 import { Text, YStack } from 'tamagui'
 import { useThemeColor } from '../../hooks/useThemeColor'
-import type { Message } from '../../types'
+import type { MessageWithDetails } from '../../types'
 import { DateSeparator } from './DateSeparator'
 import { NoteBubble } from './NoteBubble'
 
 interface MessageListProps {
-  messages: Message[]
+  messages: MessageWithDetails[]
   onLoadMore: () => void
   isLoading: boolean
   chatId: string
-  onMessageLongPress: (message: Message) => void
-  onMessagePress?: (message: Message) => void
-  onTaskToggle: (message: Message) => void
+  onMessageLongPress: (message: MessageWithDetails) => void
+  onMessagePress?: (message: MessageWithDetails) => void
+  onTaskToggle: (message: MessageWithDetails) => void
   highlightedMessageId?: string
   selectedMessageIds?: Set<string>
 }
@@ -24,7 +24,7 @@ export interface MessageListRef {
 }
 
 type ListItem =
-  | { type: 'message'; data: Message }
+  | { type: 'message'; data: MessageWithDetails }
   | { type: 'date'; date: Date; id: string }
 
 function isSameDay(date1: Date, date2: Date): boolean {
@@ -35,7 +35,7 @@ function isSameDay(date1: Date, date2: Date): boolean {
   )
 }
 
-function processMessages(messages: Message[]): ListItem[] {
+function processMessages(messages: MessageWithDetails[]): ListItem[] {
   const items: ListItem[] = []
 
   // Sort newest first (for inverted list)
@@ -83,7 +83,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(({
 
   const scrollToMessage = useCallback((messageId: string) => {
     const index = items.findIndex(
-      item => item.type === 'message' && item.data._id === messageId
+      item => item.type === 'message' && item.data.id === messageId
     )
     if (index !== -1 && flatListRef.current) {
       flatListRef.current.scrollToIndex({
@@ -119,8 +119,8 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(({
           onLongPress={onMessageLongPress}
           onPress={onMessagePress}
           onTaskToggle={onTaskToggle}
-          isHighlighted={item.data._id === highlightedMessageId}
-          isSelected={selectedMessageIds?.has(item.data._id)}
+          isHighlighted={item.data.id === highlightedMessageId}
+          isSelected={selectedMessageIds?.has(item.data.id)}
         />
       )
     },
@@ -128,7 +128,7 @@ export const MessageList = forwardRef<MessageListRef, MessageListProps>(({
   )
 
   const keyExtractor = useCallback((item: ListItem) => {
-    return item.type === 'date' ? item.id : item.data._id
+    return item.type === 'date' ? item.id : item.data.id
   }, [])
 
   const handleEndReached = useCallback(() => {

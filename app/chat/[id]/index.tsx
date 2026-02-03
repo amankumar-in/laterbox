@@ -12,7 +12,7 @@ import { MessageInput } from '../../../components/message/MessageInput'
 import { SelectionActionBar } from '../../../components/message/SelectionActionBar'
 import { useChat, useUpdateChat } from '../../../hooks/useChats'
 import { useMessages, useSendMessage, useUpdateMessage, useDeleteMessage, useLockMessage, useStarMessage, useSetMessageTask, useCompleteTask } from '../../../hooks/useMessages'
-import type { Chat, Message, MessageType } from '../../../types'
+import type { ChatWithLastMessage, MessageWithDetails, MessageType } from '../../../types'
 
 export default function ChatScreen() {
   const router = useRouter()
@@ -21,7 +21,7 @@ export default function ChatScreen() {
   const isNew = Array.isArray(params.new) ? params.new[0] : params.new
   const targetMessageId = Array.isArray(params.messageId) ? params.messageId[0] : params.messageId
   const insets = useSafeAreaInsets()
-  const [editingMessage, setEditingMessage] = useState<Message | null>(null)
+  const [editingMessage, setEditingMessage] = useState<MessageWithDetails | null>(null)
   const [showAttachments, setShowAttachments] = useState(false)
   const [isEditingName, setIsEditingName] = useState(isNew === '1')
   const [editedName, setEditedName] = useState('')
@@ -93,7 +93,7 @@ export default function ChatScreen() {
   const highlightedMessageId = useMemo(() => {
     // Prioritize search results when searching
     if (searchResults.length > 0) {
-      return searchResults[searchResultIndex]?._id
+      return searchResults[searchResultIndex]?.id
     }
     // Otherwise use flashMessageId from navigation (e.g., from tasks page)
     return flashMessageId
@@ -168,7 +168,7 @@ export default function ChatScreen() {
     (message: { content?: string; type: MessageType }) => {
       if (editingMessage) {
         updateMessageMutation.mutate({
-          messageId: editingMessage._id,
+          messageId: editingMessage.id,
           content: message.content || '',
         })
         setEditingMessage(null)
@@ -184,18 +184,18 @@ export default function ChatScreen() {
 
   const isSelectionMode = selectedMessageIds.size > 0
 
-  const handleMessageLongPress = useCallback((message: Message) => {
-    setSelectedMessageIds(new Set([message._id]))
+  const handleMessageLongPress = useCallback((message: MessageWithDetails) => {
+    setSelectedMessageIds(new Set([message.id]))
   }, [])
 
-  const handleMessagePress = useCallback((message: Message) => {
+  const handleMessagePress = useCallback((message: MessageWithDetails) => {
     if (selectedMessageIds.size > 0) {
       setSelectedMessageIds(prev => {
         const next = new Set(prev)
-        if (next.has(message._id)) {
-          next.delete(message._id)
+        if (next.has(message.id)) {
+          next.delete(message.id)
         } else {
-          next.add(message._id)
+          next.add(message.id)
         }
         return next
       })
@@ -207,14 +207,14 @@ export default function ChatScreen() {
   }, [])
 
   const selectedMessages = useMemo(() => {
-    return messages.filter(m => selectedMessageIds.has(m._id))
+    return messages.filter(m => selectedMessageIds.has(m.id))
   }, [messages, selectedMessageIds])
 
   const handleSelectionLock = useCallback(() => {
     const shouldLock = !selectedMessages.every(m => m.isLocked)
     selectedMessages.forEach(m => {
       lockMessageMutation.mutate({
-        messageId: m._id,
+        messageId: m.id,
         isLocked: shouldLock,
       })
     })
@@ -237,7 +237,7 @@ export default function ChatScreen() {
           style: 'destructive',
           onPress: () => {
             selectedMessages.forEach(m => {
-              deleteMessageMutation.mutate(m._id)
+              deleteMessageMutation.mutate(m.id)
             })
             handleClearSelection()
           },
@@ -259,7 +259,7 @@ export default function ChatScreen() {
     } else {
       selectedMessages.forEach(m => {
         setMessageTaskMutation.mutate({
-          messageId: m._id,
+          messageId: m.id,
           isTask: false,
         })
       })
@@ -287,7 +287,7 @@ export default function ChatScreen() {
     const finalDate = date || reminderDate
     selectedMessages.forEach(m => {
       setMessageTaskMutation.mutate({
-        messageId: m._id,
+        messageId: m.id,
         isTask: true,
         reminderAt: finalDate.toISOString(),
       })
@@ -307,20 +307,20 @@ export default function ChatScreen() {
     const shouldStar = !selectedMessages.every(m => m.isStarred)
     selectedMessages.forEach(m => {
       starMessageMutation.mutate({
-        messageId: m._id,
+        messageId: m.id,
         isStarred: shouldStar,
       })
     })
     handleClearSelection()
   }, [selectedMessages, starMessageMutation, handleClearSelection])
 
-  const handleTaskToggle = useCallback((message: Message) => {
+  const handleTaskToggle = useCallback((message: MessageWithDetails) => {
     if (!message.task.isCompleted) {
-      completeTaskMutation.mutate(message._id)
+      completeTaskMutation.mutate(message.id)
     } else {
       // Uncomplete by setting task again
       setMessageTaskMutation.mutate({
-        messageId: message._id,
+        messageId: message.id,
         isTask: true,
         reminderAt: message.task.reminderAt,
         isCompleted: false,
@@ -351,13 +351,15 @@ export default function ChatScreen() {
   }, [])
 
   // Create a display chat object for the header
-  const displayChat: Chat = chat || {
-    _id: id || '',
+  const displayChat: ChatWithLastMessage = chat || {
+    id: id || '',
+    serverId: null,
     name: editedName || 'New Thread',
-    ownerId: '',
-    participants: [],
-    isShared: false,
+    icon: null,
     isPinned: false,
+    wallpaper: null,
+    lastMessage: null,
+    syncStatus: 'pending',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }

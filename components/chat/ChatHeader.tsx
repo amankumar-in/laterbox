@@ -4,10 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { TextInput, Image } from 'react-native'
 import { useThemeColor } from '../../hooks/useThemeColor'
-import type { Chat } from '../../types'
+import type { ChatWithLastMessage } from '../../types'
 
 interface ChatHeaderProps {
-  chat: Chat
+  chat: ChatWithLastMessage
   onBack: () => void
   onChatPress: () => void
   onSearch: () => void
@@ -80,7 +80,7 @@ export function ChatHeader({
 
   const handleMenuSelect = (id: string) => {
     setMenuOpen(false)
-    console.log('Menu selected:', id, chat._id)
+    console.log('Menu selected:', id, chat.id)
     onMenu()
   }
 

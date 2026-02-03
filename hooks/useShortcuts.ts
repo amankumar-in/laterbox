@@ -1,9 +1,9 @@
 import { useCallback } from 'react'
 import Shortcuts from '@rn-org/react-native-shortcuts'
-import type { Chat } from '../types'
+import type { ChatWithLastMessage } from '../types'
 
 export function useShortcuts() {
-  const addShortcut = useCallback(async (chat: Chat) => {
+  const addShortcut = useCallback(async (chat: ChatWithLastMessage) => {
     try {
       const isSupported = await Shortcuts.isShortcutSupported()
       if (!isSupported) {
@@ -12,11 +12,11 @@ export function useShortcuts() {
       }
 
       // Check if shortcut already exists
-      const exists = await Shortcuts.isShortcutExists(chat._id)
+      const exists = await Shortcuts.isShortcutExists(chat.id)
       if (exists) {
         // Update existing shortcut
         await Shortcuts.updateShortcut({
-          id: chat._id,
+          id: chat.id,
           title: chat.name,
           longLabel: chat.lastMessage?.content?.slice(0, 25) || chat.name,
           subTitle: chat.lastMessage?.content?.slice(0, 50) || 'Open chat',
@@ -26,7 +26,7 @@ export function useShortcuts() {
       } else {
         // Add new shortcut
         await Shortcuts.addShortcut({
-          id: chat._id,
+          id: chat.id,
           title: chat.name,
           longLabel: chat.lastMessage?.content?.slice(0, 25) || chat.name,
           subTitle: chat.lastMessage?.content?.slice(0, 50) || 'Open chat',

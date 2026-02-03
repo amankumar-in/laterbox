@@ -8,7 +8,8 @@ import chatRoutes from './routes/chats.js';
 import messageRoutes from './routes/messages.js';
 import taskRoutes from './routes/tasks.js';
 import searchRoutes from './routes/search.js';
-import shareRoutes from './routes/share.js';
+import syncRoutes from './routes/sync.js';
+import verifyRoutes from './routes/verify.js';
 
 // Middleware
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
@@ -61,7 +62,8 @@ app.use('/api/chats', chatRoutes);
 app.use('/api/chats', messageRoutes); // Messages are at /api/chats/:chatId/messages
 app.use('/api/tasks', taskRoutes);
 app.use('/api/search', searchRoutes);
-app.use('/api/share', shareRoutes);
+app.use('/api/sync', syncRoutes);
+app.use('/api/verify', verifyRoutes);
 
 // Error handling
 app.use(notFoundHandler);

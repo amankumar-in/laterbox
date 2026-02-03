@@ -3,13 +3,13 @@ import { XStack, YStack, Text } from 'tamagui'
 import { Pressable } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useThemeColor } from '../../hooks/useThemeColor'
-import type { Message } from '../../types'
+import type { MessageWithDetails } from '../../types'
 
 interface NoteBubbleProps {
-  message: Message
-  onLongPress: (message: Message) => void
-  onPress?: (message: Message) => void
-  onTaskToggle?: (message: Message) => void
+  message: MessageWithDetails
+  onLongPress: (message: MessageWithDetails) => void
+  onPress?: (message: MessageWithDetails) => void
+  onTaskToggle?: (message: MessageWithDetails) => void
   isHighlighted?: boolean
   isSelected?: boolean
 }

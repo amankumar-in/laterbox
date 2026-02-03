@@ -22,7 +22,9 @@ import {
 } from '@expo-google-fonts/inter'
 
 import { tamaguiConfig } from '../tamagui.config'
-import { registerDevice } from '../services/api'
+import { DatabaseProvider } from '@/contexts/DatabaseContext'
+import { useRegisterDevice } from '@/hooks/useUser'
+import { useAutoSync } from '@/hooks/useSyncService'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,21 +35,16 @@ const queryClient = new QueryClient({
   },
 })
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme()
+// Inner component that uses hooks requiring database context
+function AppContent() {
   const router = useRouter()
+  const registerDevice = useRegisterDevice()
 
-  const [fontsLoaded] = useFonts({
-    Inter: Inter_400Regular,
-    InterMedium: Inter_500Medium,
-    InterSemiBold: Inter_600SemiBold,
-    InterBold: Inter_700Bold,
-    InterExtraBold: Inter_800ExtraBold,
-    InterBlack: Inter_900Black,
-  })
+  // Auto-sync on app foreground
+  useAutoSync()
 
   useEffect(() => {
-    registerDevice().catch(console.error)
+    registerDevice.mutate()
   }, [])
 
   // Handle shortcut navigation
@@ -69,6 +66,26 @@ export default function RootLayout() {
     return () => subscription?.remove()
   }, [router])
 
+  return (
+    <>
+      <Stack screenOptions={{ headerShown: false }} />
+      <StatusBar style="auto" translucent />
+    </>
+  )
+}
+
+export default function RootLayout() {
+  const colorScheme = useColorScheme()
+
+  const [fontsLoaded] = useFonts({
+    Inter: Inter_400Regular,
+    InterMedium: Inter_500Medium,
+    InterSemiBold: Inter_600SemiBold,
+    InterBold: Inter_700Bold,
+    InterExtraBold: Inter_800ExtraBold,
+    InterBlack: Inter_900Black,
+  })
+
   const theme = colorScheme || 'light'
 
   if (!fontsLoaded) {
@@ -82,8 +99,9 @@ export default function RootLayout() {
           <TamaguiProvider config={tamaguiConfig} defaultTheme={theme}>
             <PortalProvider shouldAddRootHost>
               <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                <Stack screenOptions={{ headerShown: false }} />
-                <StatusBar style="auto" translucent />
+                <DatabaseProvider>
+                  <AppContent />
+                </DatabaseProvider>
               </ThemeProvider>
             </PortalProvider>
           </TamaguiProvider>

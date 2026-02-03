@@ -77,8 +77,8 @@ export default function NotificationsScreen() {
   return (
     <YStack flex={1} backgroundColor="$background">
       <XStack
-        paddingTop={insets.top}
-        paddingHorizontal="$2"
+        paddingTop={insets.top + 8}
+        paddingHorizontal="$4"
         paddingBottom="$2"
         backgroundColor="$background"
         alignItems="center"

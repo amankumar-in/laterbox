@@ -2,10 +2,10 @@ import { XStack, YStack, Text } from 'tamagui'
 import { Image } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useThemeColor } from '../hooks/useThemeColor'
-import type { Chat } from '../types'
+import type { ChatWithLastMessage } from '../types'
 
 interface NoteListItemProps {
-  chat: Chat
+  chat: ChatWithLastMessage
   onPress: () => void
   onLongPress: () => void
 }
@@ -30,7 +30,7 @@ function formatRelativeTime(dateString: string): string {
   })
 }
 
-function getMessagePreview(chat: Chat): string {
+function getMessagePreview(chat: ChatWithLastMessage): string {
   if (!chat.lastMessage) return 'It is a blank slate!'
 
   switch (chat.lastMessage.type) {

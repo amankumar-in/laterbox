@@ -243,39 +243,6 @@ export async function searchInChat(
   return response.data
 }
 
-// Share
-export async function lookupUser(
-  query: string
-): Promise<{ user: { id: string; name: string; avatar?: string } | null }> {
-  const api = await getApi()
-  const response = await api.post('/share/lookup', { query })
-  return response.data
-}
-
-export async function shareChat(
-  chatId: string,
-  data: { userId: string; permissions?: { canEdit?: boolean; canDelete?: boolean } }
-): Promise<void> {
-  const api = await getApi()
-  await api.post(`/share/chat/${chatId}`, data)
-}
-
-export async function getPendingShares(): Promise<{ pendingShares: any[] }> {
-  const api = await getApi()
-  const response = await api.get('/share/pending')
-  return response.data
-}
-
-export async function acceptShare(shareId: string): Promise<void> {
-  const api = await getApi()
-  await api.put(`/share/accept/${shareId}`)
-}
-
-export async function rejectShare(shareId: string): Promise<void> {
-  const api = await getApi()
-  await api.put(`/share/reject/${shareId}`)
-}
-
 // Export
 export async function exportChat(
   chatId: string,

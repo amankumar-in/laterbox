@@ -82,7 +82,7 @@ export default function ChatInfoScreen() {
   const handleExport = useCallback(async () => {
     if (!chat) return
     try {
-      await exportChat(chat._id, chat.name)
+      await exportChat(chat.id, chat.name)
     } catch {
       Alert.alert('Export Failed', 'Could not export the chat.')
     }
@@ -97,10 +97,6 @@ export default function ChatInfoScreen() {
       Alert.alert('Failed', 'Could not add shortcut.')
     }
   }, [chat, addShortcut])
-
-  const handleShare = useCallback(() => {
-    router.push(`/chat/${id}/share`)
-  }, [router, id])
 
   const handleMediaFiles = useCallback(() => {
     router.push(`/chat/${id}/media`)
@@ -270,25 +266,7 @@ export default function ChatInfoScreen() {
             loading={isExporting}
             iconColor={iconColor}
           />
-          <MenuItem
-            icon="share-outline"
-            label="Share"
-            onPress={handleShare}
-            iconColor={iconColor}
-          />
         </YStack>
-
-        {/* Members */}
-        {chat.isShared && chat.participants.length > 0 && (
-          <YStack paddingHorizontal="$4" marginTop="$6">
-            <Text fontSize="$4" fontWeight="600" color="$color" marginBottom="$3">
-              Members
-            </Text>
-            <Text color="$colorSubtle" fontSize="$3">
-              {chat.participants.length + 1} participant{chat.participants.length > 0 ? 's' : ''}
-            </Text>
-          </YStack>
-        )}
       </ScrollView>
     </YStack>
   )

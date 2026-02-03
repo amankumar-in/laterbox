@@ -1,10 +1,11 @@
-import { useCallback } from 'react'
-import { ScrollView, Alert } from 'react-native'
+import { useState, useCallback } from 'react'
+import { ScrollView, Alert, Image, Switch } from 'react-native'
 import { YStack, XStack, Text, Button, Separator } from 'tamagui'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useThemeColor } from '../../hooks/useThemeColor'
+import { useUser } from '../../hooks/useUser'
 
 interface SettingsItemProps {
   icon: keyof typeof Ionicons.glyphMap
@@ -63,6 +64,64 @@ function SettingsItem({
   )
 }
 
+interface SettingsToggleItemProps {
+  icon: keyof typeof Ionicons.glyphMap
+  iconColor: string
+  title: string
+  subtitle?: string
+  value: boolean
+  onValueChange: (value: boolean) => void
+  trackColor: string
+}
+
+function SettingsToggleItem({
+  icon,
+  iconColor,
+  title,
+  subtitle,
+  value,
+  onValueChange,
+  trackColor,
+}: SettingsToggleItemProps) {
+  return (
+    <XStack
+      paddingHorizontal="$4"
+      paddingVertical="$3"
+      gap="$3"
+      alignItems="center"
+    >
+      <XStack
+        width={36}
+        height={36}
+        borderRadius="$2"
+        backgroundColor="$backgroundStrong"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Ionicons name={icon} size={20} color={iconColor} />
+      </XStack>
+
+      <YStack flex={1}>
+        <Text fontSize="$4" color="$color">
+          {title}
+        </Text>
+        {subtitle && (
+          <Text fontSize="$2" color="$colorSubtle">
+            {subtitle}
+          </Text>
+        )}
+      </YStack>
+
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: '#767577', true: trackColor }}
+        thumbColor="white"
+      />
+    </XStack>
+  )
+}
+
 function SectionHeader({ title }: { title: string }) {
   return (
     <Text
@@ -82,7 +141,9 @@ function SectionHeader({ title }: { title: string }) {
 export default function SettingsScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
-  const { iconColorStrong, iconColor, brandText, accentColor, successColor, warningColor, infoColor } = useThemeColor()
+  const { iconColorStrong, iconColor, brandText, accentColor, successColor, warningColor, infoColor, errorColor } = useThemeColor()
+  const { data: user } = useUser()
+  const [dataSyncEnabled, setDataSyncEnabled] = useState(true)
 
   const handleBack = useCallback(() => {
     router.back()
@@ -109,10 +170,6 @@ export default function SettingsScreen() {
     ])
   }, [])
 
-  const handleStorage = useCallback(() => {
-    console.log('Storage & Data')
-  }, [])
-
   const handleHelp = useCallback(() => {
     console.log('Help')
   }, [])
@@ -124,29 +181,61 @@ export default function SettingsScreen() {
     )
   }, [])
 
-  const handleDeleteAccount = useCallback(() => {
+  const handleDeleteRemoteData = useCallback(() => {
     Alert.alert(
-      'Delete Account',
-      'Are you sure you want to delete your account? This will permanently delete all your notes, tasks, and data. This action cannot be undone.',
+      'Delete Remote Data',
+      'This will permanently delete all threads, tasks, and notes stored online. Local data will remain. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Confirm Delete',
-              'Type DELETE to confirm account deletion',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Confirm',
-                  style: 'destructive',
-                  onPress: () => console.log('Account deleted'),
-                },
-              ]
-            )
-          },
+          onPress: () => console.log('Remote data deleted'),
+        },
+      ]
+    )
+  }, [])
+
+  const handleDeleteAccountInfo = useCallback(() => {
+    Alert.alert(
+      'Delete Account Information',
+      'This will remove your name, email, phone, and username. Your app will continue to work locally.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => console.log('Account info deleted'),
+        },
+      ]
+    )
+  }, [])
+
+  const handleDeleteMedia = useCallback(() => {
+    Alert.alert(
+      'Delete All Media',
+      'This will delete all photos, videos, and files stored locally. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => console.log('Media deleted'),
+        },
+      ]
+    )
+  }, [])
+
+  const handleDeleteEverything = useCallback(() => {
+    Alert.alert(
+      'Delete Everything',
+      'This will delete all remote data, local data, settings, and reset the app as if started for the first time. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Everything',
+          style: 'destructive',
+          onPress: () => console.log('Everything deleted'),
         },
       ]
     )
@@ -155,8 +244,8 @@ export default function SettingsScreen() {
   return (
     <YStack flex={1} backgroundColor="$background">
       <XStack
-        paddingTop={insets.top}
-        paddingHorizontal="$2"
+        paddingTop={insets.top + 8}
+        paddingHorizontal="$4"
         paddingBottom="$2"
         backgroundColor="$background"
         alignItems="center"
@@ -185,41 +274,42 @@ export default function SettingsScreen() {
           pressStyle={{ backgroundColor: '$backgroundHover' }}
           onPress={handleProfile}
         >
-          <XStack
-            width={60}
-            height={60}
-            borderRadius={30}
-            backgroundColor="$brandBackground"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Text color={brandText} fontSize="$6" fontWeight="600">
-              ME
-            </Text>
-          </XStack>
+          {user?.avatar ? (
+            <Image
+              source={{ uri: user.avatar }}
+              style={{ width: 60, height: 60, borderRadius: 30 }}
+            />
+          ) : (
+            <XStack
+              width={60}
+              height={60}
+              borderRadius={30}
+              backgroundColor="$brandBackground"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <Text color={brandText} fontSize="$6" fontWeight="600">
+                {(user?.name || 'Me').slice(0, 2).toUpperCase()}
+              </Text>
+            </XStack>
+          )}
 
           <YStack flex={1}>
             <Text fontSize="$5" fontWeight="600" color="$color">
-              Me
+              {user?.name || 'Me'}
             </Text>
             <Text fontSize="$3" color="$colorSubtle">
-              Tap to edit profile
+              {user?.username ? `@${user.username}` : 'Username not set'}
             </Text>
           </YStack>
 
-          <Ionicons name="chevron-forward" size={20} color={iconColor} />
+          <XStack backgroundColor="$backgroundStrong" paddingHorizontal="$2" paddingVertical="$1" borderRadius="$2">
+            <Text fontSize="$2" color="$colorSubtle">View Profile</Text>
+          </XStack>
         </XStack>
 
         <Separator />
 
-        <SectionHeader title="Account" />
-        <SettingsItem
-          icon="person-outline"
-          iconColor={accentColor}
-          title="Edit Profile"
-          subtitle="Name, username, email"
-          onPress={handleProfile}
-        />
         <SettingsItem
           icon="lock-closed-outline"
           iconColor={successColor}
@@ -227,8 +317,6 @@ export default function SettingsScreen() {
           subtitle="Who can find you"
           onPress={handlePrivacy}
         />
-
-        <SectionHeader title="App" />
         <SettingsItem
           icon="notifications-outline"
           iconColor={warningColor}
@@ -244,14 +332,6 @@ export default function SettingsScreen() {
           onPress={handleTheme}
         />
         <SettingsItem
-          icon="server-outline"
-          iconColor={infoColor}
-          title="Storage & Data"
-          onPress={handleStorage}
-        />
-
-        <SectionHeader title="About" />
-        <SettingsItem
           icon="help-circle-outline"
           iconColor="#6366f1"
           title="Help"
@@ -264,13 +344,46 @@ export default function SettingsScreen() {
           onPress={handleAbout}
         />
 
-        <SectionHeader title="Danger Zone" />
+        <SectionHeader title="Data Control" />
+        <SettingsToggleItem
+          icon="sync-outline"
+          iconColor={accentColor}
+          title="Data Sync"
+          subtitle={dataSyncEnabled ? 'Syncing to cloud backup' : 'Fully offline mode'}
+          value={dataSyncEnabled}
+          onValueChange={setDataSyncEnabled}
+          trackColor={accentColor}
+        />
         <SettingsItem
-          icon="trash-outline"
+          icon="cloud-offline-outline"
+          iconColor={warningColor}
+          title="Delete Remote Data"
+          subtitle="Remove all threads, tasks, and notes from cloud"
+          onPress={handleDeleteRemoteData}
+          showArrow={false}
+        />
+        <SettingsItem
+          icon="person-remove-outline"
+          iconColor={warningColor}
+          title="Delete Account Information"
+          subtitle="Remove name, email, phone, username"
+          onPress={handleDeleteAccountInfo}
+          showArrow={false}
+        />
+        <SettingsItem
+          icon="images-outline"
+          iconColor={warningColor}
+          title="Delete All Media"
+          subtitle="Remove all locally stored photos and files"
+          onPress={handleDeleteMedia}
+          showArrow={false}
+        />
+        <SettingsItem
+          icon="nuclear-outline"
           iconColor=""
-          title="Delete Account"
-          subtitle="Permanently delete all data"
-          onPress={handleDeleteAccount}
+          title="Delete Everything"
+          subtitle="Reset app to factory state"
+          onPress={handleDeleteEverything}
           showArrow={false}
           danger
         />

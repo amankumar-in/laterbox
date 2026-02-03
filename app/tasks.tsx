@@ -4,15 +4,13 @@ import { YStack, XStack, Text, Button } from 'tamagui'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { SearchBar } from '../components/SearchBar'
 import { FilterChips } from '../components/FilterChips'
 import { useThemeColor } from '../hooks/useThemeColor'
 import { useTasks } from '../hooks/useTasks'
-import { completeTask, setMessageTask } from '../services/api'
-import type { Message } from '../types'
-
-type TaskFilter = 'pending' | 'completed' | 'all'
+import { useCompleteTask, useSetMessageTask } from '../hooks/useMessages'
+import type { MessageWithDetails, TaskFilter } from '../types'
 
 const FILTER_OPTIONS = [
   { key: 'pending', label: 'Pending' },
@@ -21,7 +19,7 @@ const FILTER_OPTIONS = [
 ]
 
 interface TaskItemProps {
-  task: Message
+  task: MessageWithDetails
   onToggle: () => void
   onPress: () => void
   showChatName?: boolean
@@ -115,7 +113,7 @@ export default function TasksScreen() {
   const [filter, setFilter] = useState<TaskFilter>('pending')
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Fetch tasks from API
+  // Fetch tasks from local database
   const { data, isLoading, refetch } = useTasks({
     chatId: chatId || undefined,
     filter: filter === 'all' ? undefined : filter,
@@ -123,25 +121,10 @@ export default function TasksScreen() {
 
   const tasks = data?.tasks ?? []
 
-  // Mutation for completing tasks
-  const completeMutation = useMutation({
-    mutationFn: ({ chatId, messageId }: { chatId: string; messageId: string }) =>
-      completeTask(chatId, messageId),
-    onSuccess: (_, { chatId }) => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['messages', chatId] })
-    },
-  })
-
-  // Mutation for uncompleting tasks
-  const uncompleteMutation = useMutation({
-    mutationFn: ({ chatId, messageId, reminderAt }: { chatId: string; messageId: string; reminderAt?: string }) =>
-      setMessageTask(chatId, messageId, { isTask: true, reminderAt, isCompleted: false }),
-    onSuccess: (_, { chatId }) => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['messages', chatId] })
-    },
-  })
+  // Mutations for toggling task completion
+  // We need a chatId for the hooks, so we'll use the task's chatId
+  const completeMutation = useCompleteTask(chatId || '')
+  const setTaskMutation = useSetMessageTask(chatId || '')
 
   // Apply search filter (client-side)
   const filteredTasks = useMemo(() => {
@@ -155,23 +138,29 @@ export default function TasksScreen() {
   }, [router])
 
   const handleToggle = useCallback(
-    (task: Message) => {
+    (task: MessageWithDetails) => {
+      // Create a new mutation for this specific chat
       if (!task.task.isCompleted) {
-        completeMutation.mutate({ chatId: task.chatId, messageId: task._id })
+        queryClient.invalidateQueries({ queryKey: ['tasks'] })
+        queryClient.invalidateQueries({ queryKey: ['messages', task.chatId] })
+        completeMutation.mutate(task.id)
       } else {
-        uncompleteMutation.mutate({
-          chatId: task.chatId,
-          messageId: task._id,
+        queryClient.invalidateQueries({ queryKey: ['tasks'] })
+        queryClient.invalidateQueries({ queryKey: ['messages', task.chatId] })
+        setTaskMutation.mutate({
+          messageId: task.id,
+          isTask: true,
           reminderAt: task.task.reminderAt,
+          isCompleted: false,
         })
       }
     },
-    [completeMutation, uncompleteMutation]
+    [completeMutation, setTaskMutation, queryClient]
   )
 
   const handleTaskPress = useCallback(
-    (task: Message) => {
-      router.push(`/chat/${task.chatId}?messageId=${task._id}`)
+    (task: MessageWithDetails) => {
+      router.push(`/chat/${task.chatId}?messageId=${task.id}`)
     },
     [router]
   )
@@ -223,7 +212,7 @@ export default function TasksScreen() {
       ) : (
         <FlatList
           data={filteredTasks}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <TaskItem
               task={item}

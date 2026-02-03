@@ -3,7 +3,7 @@ import { XStack, YStack, Input, Button, Text } from 'tamagui'
 import { Ionicons } from '@expo/vector-icons'
 import { Keyboard, TextInput } from 'react-native'
 import { useThemeColor } from '../../hooks/useThemeColor'
-import type { Message, MessageType } from '../../types'
+import type { MessageWithDetails, MessageType } from '../../types'
 
 const attachmentOptions = [
   { id: 'image', icon: 'image-outline', label: 'Image', color: '$purple5' },
@@ -19,7 +19,7 @@ interface MessageInputProps {
   onAttachmentSelect: (type: string) => void
   onVoiceStart: () => void
   onVoiceEnd: (uri: string) => void
-  editingMessage?: Message | null
+  editingMessage?: MessageWithDetails | null
   onCancelEdit?: () => void
   showAttachments: boolean
   onToggleAttachments: () => void

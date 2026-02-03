@@ -19,7 +19,7 @@ import {
 import { useExportChat } from '../hooks/useExportChat'
 import { useShortcuts } from '../hooks/useShortcuts'
 import { useThemeColor } from '../hooks/useThemeColor'
-import type { Chat, ChatFilter } from '../types'
+import type { ChatWithLastMessage, ChatFilter } from '../types'
 
 const FILTER_OPTIONS = [
   { key: 'threads', label: 'Threads' },
@@ -50,23 +50,23 @@ export default function HomeScreen() {
   const { exportChat, isExporting } = useExportChat()
   const { addShortcut } = useShortcuts()
 
-  const chats = data?.chats ?? []
+  const chats = data?.data ?? []
 
   const handleChatPress = useCallback(
-    (chat: Chat) => {
-      router.push(`/chat/${chat._id}`)
+    (chat: ChatWithLastMessage) => {
+      router.push(`/chat/${chat.id}`)
     },
     [router]
   )
 
   const handleChatLongPress = useCallback(
-    (chat: Chat) => {
+    (chat: ChatWithLastMessage) => {
       Alert.alert(chat.name, 'Choose an action', [
         {
           text: chat.isPinned ? 'Unpin' : 'Pin',
           onPress: () => {
             updateChat.mutate({
-              id: chat._id,
+              id: chat.id,
               data: { isPinned: !chat.isPinned },
             })
           },
@@ -75,7 +75,7 @@ export default function HomeScreen() {
           text: 'Export',
           onPress: async () => {
             try {
-              await exportChat(chat._id, chat.name)
+              await exportChat(chat.id, chat.name)
             } catch {
               Alert.alert('Export Failed', 'Could not export the chat.')
             }
@@ -105,7 +105,7 @@ export default function HomeScreen() {
                   text: 'Delete',
                   style: 'destructive',
                   onPress: () => {
-                    deleteChat.mutate(chat._id)
+                    deleteChat.mutate(chat.id)
                   },
                 },
               ]
@@ -121,7 +121,7 @@ export default function HomeScreen() {
   const handleCreateChat = useCallback(async () => {
     try {
       const chat = await createChat.mutateAsync({ name: 'New Thread' })
-      router.push(`/chat/${chat._id}?new=1`)
+      router.push(`/chat/${chat.id}?new=1`)
     } catch {
       Alert.alert('Error', 'Could not create the note.')
     }
@@ -265,7 +265,7 @@ export default function HomeScreen() {
 
         <FlatList
           data={chats}
-          keyExtractor={(item) => item._id}
+          keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <NoteListItem
               chat={item}
