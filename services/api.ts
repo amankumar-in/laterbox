@@ -134,6 +134,34 @@ export async function checkUsername(username: string): Promise<{ available: bool
   return response.data
 }
 
+// Phone auth (no token required)
+export async function sendPhoneCode(phone: string): Promise<{ isExisting: boolean }> {
+  const api = await getApi()
+  const response = await api.post('/auth/phone/send', { phone })
+  return response.data
+}
+
+export async function verifyPhoneCode(phone: string, code: string, name?: string): Promise<{ token: string; user: User; isNew: boolean }> {
+  const api = await getApi()
+  const response = await api.post('/auth/phone/verify', { phone, code, name })
+  await updateApiToken(response.data.token)
+  return response.data
+}
+
+// Email auth (no token required)
+export async function sendEmailCode(email: string): Promise<{ isExisting: boolean }> {
+  const api = await getApi()
+  const response = await api.post('/auth/email/send', { email })
+  return response.data
+}
+
+export async function verifyEmailCode(email: string, code: string, name?: string): Promise<{ token: string; user: User; isNew: boolean }> {
+  const api = await getApi()
+  const response = await api.post('/auth/email/verify', { email, code, name })
+  await updateApiToken(response.data.token)
+  return response.data
+}
+
 // Check if user is authenticated (has valid token)
 export async function isAuthenticated(): Promise<boolean> {
   const token = await getAuthToken()

@@ -48,6 +48,10 @@ const chatSchema = new mongoose.Schema({
     },
     timestamp: Date,
   },
+  deletedAt: {
+    type: Date,
+    default: null,
+  },
 }, {
   timestamps: true,
 });

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
-import { ScrollView, Alert, Image, Pressable, Platform, Modal, TextInput, FlatList } from 'react-native'
+import { ScrollView, Alert, Image, Pressable, Modal, TextInput, FlatList } from 'react-native'
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { YStack, XStack, Text, Button, Input, Spinner } from 'tamagui'
 import { useRouter } from 'expo-router'
@@ -8,9 +8,9 @@ import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { Country, CountryCode, getAllCountries, FlagType } from 'react-native-country-picker-modal'
 
+import { useQueryClient } from '@tanstack/react-query'
 import { useThemeColor } from '../../hooks/useThemeColor'
 import { useUser, useUpdateUser, useIsAuthenticated } from '../../hooks/useUser'
-import { getAuthToken } from '../../services/storage'
 import {
   signup,
   login,
@@ -18,9 +18,12 @@ import {
   setPassword as setPasswordApi,
   changePassword as changePasswordApi,
   checkUsername as checkUsernameApi,
+  sendPhoneCode as sendPhoneCodeApi,
+  verifyPhoneCode as verifyPhoneCodeApi,
+  sendEmailCode as sendEmailCodeApi,
+  verifyEmailCode as verifyEmailCodeApi,
 } from '../../services/api'
 import { useSyncService } from '../../hooks/useSyncService'
-import axios from 'axios'
 
 const countryCodeToEmoji = (code: string) => {
   const codePoints = code
@@ -30,14 +33,6 @@ const countryCodeToEmoji = (code: string) => {
   return String.fromCodePoint(...codePoints)
 }
 
-const getApiUrl = () => {
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:3000/api'
-  }
-  return 'http://localhost:3000/api'
-}
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL || getApiUrl()
 
 // Row component for consistent styling - defined outside to prevent remounting
 const FieldRow = ({ children }: { children: React.ReactNode }) => (
@@ -58,10 +53,11 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets()
   const { iconColorStrong, iconColor, brandText, accentColor, placeholderColor, background, color, borderColor, successColor } = useThemeColor()
 
-  const { data: user, refetch: refetchUser } = useUser()
+  const queryClient = useQueryClient()
+  const { data: user } = useUser()
   const updateUser = useUpdateUser()
   const { data: isAuthenticated, refetch: refetchAuth } = useIsAuthenticated()
-  const { schedulePush } = useSyncService()
+  const { schedulePush, pull, push } = useSyncService()
 
   // Editing states - which field is active
   const [editingField, setEditingField] = useState<'name' | 'username' | 'email' | 'phone' | 'password' | null>(null)
@@ -86,19 +82,6 @@ export default function ProfileScreen() {
     }, 100)
     return () => clearTimeout(timer)
   }, [editingField])
-
-  // Focus code input when verification step starts
-  useEffect(() => {
-    if (emailStep === 'verify') {
-      setTimeout(() => emailCodeInputRef.current?.focus(), 100)
-    }
-  }, [emailStep])
-
-  useEffect(() => {
-    if (phoneStep === 'verify') {
-      setTimeout(() => phoneCodeInputRef.current?.focus(), 100)
-    }
-  }, [phoneStep])
 
   // Name
   const [nameValue, setNameValue] = useState('')
@@ -132,6 +115,19 @@ export default function ProfileScreen() {
   const [showCountryPicker, setShowCountryPicker] = useState(false)
   const [countries, setCountries] = useState<Country[]>([])
   const [countryFilter, setCountryFilter] = useState('')
+
+  // Focus code input when verification step starts
+  useEffect(() => {
+    if (emailStep === 'verify') {
+      setTimeout(() => emailCodeInputRef.current?.focus(), 100)
+    }
+  }, [emailStep])
+
+  useEffect(() => {
+    if (phoneStep === 'verify') {
+      setTimeout(() => phoneCodeInputRef.current?.focus(), 100)
+    }
+  }, [phoneStep])
 
   // Password
   const [hasPassword, setHasPassword] = useState(false)
@@ -273,7 +269,11 @@ export default function ProfileScreen() {
       if (usernameAvailable) {
         const res = await signup({ username: usernameValue, password: passwordValue, name: user?.name || 'Me' })
         await updateUser.mutateAsync({ username: res.user.username, name: res.user.name })
-        schedulePush()
+        queryClient.setQueryData(['user'], (old: any) => old ? {
+          ...old, username: res.user.username, name: res.user.name,
+        } : old)
+        await push()
+        await pull().catch(() => {})
         await refetchAuth()
         Alert.alert('Success', 'Account created!')
       } else if (usernameAvailable === false && !usernameError) {
@@ -285,12 +285,20 @@ export default function ProfileScreen() {
           phone: res.user.phone,
           avatar: res.user.avatar,
         })
-        schedulePush()
+        queryClient.setQueryData(['user'], (old: any) => old ? {
+          ...old,
+          username: res.user.username,
+          name: res.user.name,
+          email: res.user.email ?? old.email,
+          phone: res.user.phone ?? old.phone,
+          avatar: res.user.avatar ?? old.avatar,
+        } : old)
+        await push()
+        await pull().catch(() => {})
         await refetchAuth()
         Alert.alert('Success', 'Logged in!')
       }
       setEditingField(null)
-      await refetchUser()
     } catch (err: any) {
       setUsernameError(err.response?.data?.error || 'Failed')
     } finally {
@@ -309,17 +317,10 @@ export default function ProfileScreen() {
 
   const sendEmailCode = async () => {
     if (!emailValue) return
-    if (!isAuthenticated) {
-      setEmailError('Set username first')
-      return
-    }
     setSavingEmail(true)
     setEmailError('')
     try {
-      const token = await getAuthToken()
-      await axios.post(`${API_URL}/verify/email/send`, { email: emailValue }, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      await sendEmailCodeApi(emailValue)
       setEmailStep('verify')
     } catch (err: any) {
       setEmailError(err.response?.data?.error || 'Failed to send')
@@ -333,16 +334,35 @@ export default function ProfileScreen() {
     setSavingEmail(true)
     setEmailError('')
     try {
-      const token = await getAuthToken()
-      await axios.post(`${API_URL}/verify/email/verify`, { email: emailValue, code: emailCode }, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      await updateUser.mutateAsync({ email: emailValue })
-      schedulePush()
+      const result = await verifyEmailCodeApi(emailValue, emailCode, user?.name)
+
+      // Update local SQLite (may return null if local user not found — that's ok)
+      await updateUser.mutateAsync({
+        email: result.user.email ?? null,
+        username: result.user.username ?? null,
+        phone: result.user.phone ?? null,
+        name: result.user.name || user?.name || 'Me',
+        avatar: result.user.avatar ?? null,
+      }).catch(err => console.warn('[Profile] SQLite update failed:', err))
+
+      // Force-set cache using component's user ref — guaranteed non-null since we're on this screen
+      if (user) {
+        queryClient.setQueryData(['user'], {
+          ...user,
+          email: result.user.email ?? user.email,
+          username: result.user.username ?? user.username,
+          phone: result.user.phone ?? user.phone,
+          name: result.user.name || user.name,
+          avatar: result.user.avatar ?? user.avatar,
+        })
+      }
+
+      await refetchAuth()
+      await push()
+      await pull().catch(() => {})
       setEditingField(null)
-      await refetchUser()
     } catch (err: any) {
-      setEmailError(err.response?.data?.error || 'Verification failed')
+      setEmailError(err.response?.data?.error || err.message || 'Verification failed')
     } finally {
       setSavingEmail(false)
     }
@@ -359,18 +379,11 @@ export default function ProfileScreen() {
 
   const sendPhoneCode = async () => {
     if (!phoneValue) return
-    if (!isAuthenticated) {
-      setPhoneError('Set username first')
-      return
-    }
     const fullPhone = `+${callingCode}${phoneValue}`
     setSavingPhone(true)
     setPhoneError('')
     try {
-      const token = await getAuthToken()
-      await axios.post(`${API_URL}/verify/phone/send`, { phone: fullPhone }, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      await sendPhoneCodeApi(fullPhone)
       setPhoneStep('verify')
     } catch (err: any) {
       setPhoneError(err.response?.data?.error || 'Failed to send')
@@ -385,16 +398,35 @@ export default function ProfileScreen() {
     setSavingPhone(true)
     setPhoneError('')
     try {
-      const token = await getAuthToken()
-      await axios.post(`${API_URL}/verify/phone/verify`, { phone: fullPhone, code: phoneCode }, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      await updateUser.mutateAsync({ phone: fullPhone })
-      schedulePush()
+      const result = await verifyPhoneCodeApi(fullPhone, phoneCode, user?.name)
+
+      // Update local SQLite (may return null if local user not found — that's ok)
+      await updateUser.mutateAsync({
+        phone: result.user.phone ?? null,
+        username: result.user.username ?? null,
+        email: result.user.email ?? null,
+        name: result.user.name || user?.name || 'Me',
+        avatar: result.user.avatar ?? null,
+      }).catch(err => console.warn('[Profile] SQLite update failed:', err))
+
+      // Force-set cache using component's user ref
+      if (user) {
+        queryClient.setQueryData(['user'], {
+          ...user,
+          phone: result.user.phone ?? user.phone,
+          username: result.user.username ?? user.username,
+          email: result.user.email ?? user.email,
+          name: result.user.name || user.name,
+          avatar: result.user.avatar ?? user.avatar,
+        })
+      }
+
+      await refetchAuth()
+      await push()
+      await pull().catch(() => {})
       setEditingField(null)
-      await refetchUser()
     } catch (err: any) {
-      setPhoneError(err.response?.data?.error || 'Verification failed')
+      setPhoneError(err.response?.data?.error || err.message || 'Verification failed')
     } finally {
       setSavingPhone(false)
     }
@@ -887,7 +919,7 @@ export default function ProfileScreen() {
             <XStack backgroundColor="$blue2" padding="$3" borderRadius="$3" gap="$2" alignItems="flex-start">
               <Ionicons name="information-circle-outline" size={18} color={accentColor} />
               <Text fontSize="$2" color="$blue10" flex={1}>
-                Create an account with username + password to enable cloud sync and backup.
+                Set any identifier (username, email, or phone) to enable cloud sync and backup.
               </Text>
             </XStack>
           </YStack>

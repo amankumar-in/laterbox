@@ -86,10 +86,14 @@ export function useUpdateUser() {
         avatar: data.avatar,
         settings: data.settings,
       }),
-    onSuccess: (user) => {
-      queryClient.setQueryData(['user'], user)
+    onSuccess: (updatedUser) => {
+      if (!updatedUser) {
+        console.warn('[useUpdateUser] mutation returned null - local user not found in SQLite!')
+        // Don't overwrite cache with null — caller handles cache update
+        return
+      }
+      queryClient.setQueryData(['user'], updatedUser)
       queryClient.invalidateQueries({ queryKey: ['user'] })
-      // NOTE: Sync push is handled separately - only when authenticated
     },
   })
 }

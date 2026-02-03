@@ -33,14 +33,20 @@ export class ChatRepository {
   }
 
   /**
-   * Get a chat by local ID
+   * Get a chat row by local ID (for sync; returns raw row).
    */
-  async getById(id: string): Promise<ChatWithLastMessage | null> {
-    const row = await this.db.getFirstAsync<ChatRow>(
+  async getRowById(id: string): Promise<ChatRow | null> {
+    return this.db.getFirstAsync<ChatRow>(
       `SELECT * FROM chats WHERE id = ? AND deleted_at IS NULL`,
       [id]
     )
+  }
 
+  /**
+   * Get a chat by local ID
+   */
+  async getById(id: string): Promise<ChatWithLastMessage | null> {
+    const row = await this.getRowById(id)
     if (!row) return null
     return this.mapToChat(row)
   }
@@ -201,9 +207,79 @@ export class ChatRepository {
   }
 
   /**
+   * Get chats that have never been synced (no server_id). Used so we always
+   * send every unsynced chat in push, regardless of sync_status or pending messages.
+   */
+  async getNeverSynced(): Promise<ChatRow[]> {
+    return this.db.getAllAsync<ChatRow>(
+      `SELECT * FROM chats WHERE server_id IS NULL AND deleted_at IS NULL`
+    )
+  }
+
+  /**
+   * Get all non-deleted chat rows (for sync). Ensures every chat on device is sent
+   * so server can create or correct mappings (e.g. wrong server_id from merge).
+   */
+  async getAllNonDeletedRows(): Promise<ChatRow[]> {
+    return this.db.getAllAsync<ChatRow>(
+      `SELECT * FROM chats WHERE deleted_at IS NULL`
+    )
+  }
+
+  /**
    * Mark a chat as synced with server ID
    */
   async markSynced(localId: string, serverId: string): Promise<void> {
+    const existing = await this.db.getFirstAsync<ChatRow>(
+      `SELECT * FROM chats WHERE server_id = ? AND deleted_at IS NULL`,
+      [serverId]
+    )
+
+    if (existing && existing.id !== localId) {
+      // Merge local duplicate into existing server-backed chat
+      await this.db.runAsync(
+        `UPDATE messages SET chat_id = ? WHERE chat_id = ?`,
+        [existing.id, localId]
+      )
+
+      const latestMessage = await this.db.getFirstAsync<{
+        content: string | null
+        type: string | null
+        created_at: string | null
+      }>(
+        `SELECT content, type, created_at
+         FROM messages
+         WHERE chat_id = ? AND deleted_at IS NULL
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [existing.id]
+      )
+
+      if (latestMessage) {
+        await this.db.runAsync(
+          `UPDATE chats SET
+             last_message_content = ?,
+             last_message_type = ?,
+             last_message_timestamp = ?,
+             updated_at = ?
+           WHERE id = ?`,
+          [
+            latestMessage.content ?? null,
+            latestMessage.type ?? null,
+            latestMessage.created_at ?? null,
+            getTimestamp(),
+            existing.id,
+          ]
+        )
+      }
+
+      await this.db.runAsync(
+        `DELETE FROM chats WHERE id = ?`,
+        [localId]
+      )
+      return
+    }
+
     await this.db.runAsync(
       `UPDATE chats SET server_id = ?, sync_status = 'synced' WHERE id = ?`,
       [serverId, localId]

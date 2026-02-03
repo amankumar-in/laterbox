@@ -10,34 +10,65 @@
 - User can authenticate with ANY of the three
 - Verifying one auto-fetches the others from existing account
 - Example: Reinstall app → verify phone → username and email auto-fetched
+- Sync can be enabled if any of these is set but sync is optional.
 
-### Current Backend State
+### Backend State
 - `POST /api/auth/signup` - username + password (unauthenticated) ✅
 - `POST /api/auth/login` - username + password (unauthenticated) ✅
 - `POST /api/auth/check-username` - check availability (unauthenticated) ✅
-- `POST /api/verify/email/send` - REQUIRES AUTH ❌
-- `POST /api/verify/email/verify` - REQUIRES AUTH ❌
-- `POST /api/verify/phone/send` - REQUIRES AUTH ❌
-- `POST /api/verify/phone/verify` - REQUIRES AUTH ❌
+- `POST /api/auth/phone/send` - send SMS code (unauthenticated) ⏳ NEEDS TESTING
+- `POST /api/auth/phone/verify` - verify code, return JWT + profile (unauthenticated) ⏳ NEEDS TESTING
+- `POST /api/auth/email/send` - send email code (unauthenticated) ⏳ NEEDS TESTING
+- `POST /api/auth/email/verify` - verify code, return JWT + profile (unauthenticated) ⏳ NEEDS TESTING
+- `POST /api/verify/email/send` - REQUIRES AUTH (for updating email on existing session)
+- `POST /api/verify/phone/send` - REQUIRES AUTH (for updating phone on existing session)
 
-### Required Backend Changes
-Add unauthenticated routes to `server/routes/auth.js`:
-
-1. `POST /api/auth/phone/send` - Send verification code (no auth)
-2. `POST /api/auth/phone/verify` - Verify code, return JWT + user profile
-3. `POST /api/auth/email/send` - Send verification code (no auth)
-4. `POST /api/auth/email/verify` - Verify code, return JWT + user profile
-
-### Required Frontend Changes
-1. `services/api.ts` - Add functions for phone/email auth without token
-2. `app/settings/profile.tsx` - Allow verification when not authenticated
+### Frontend State
+- `services/api.ts` - sendPhoneCode, verifyPhoneCode, sendEmailCode, verifyEmailCode ⏳ NEEDS TESTING
+- `app/settings/profile.tsx` - uses new API functions, no auth check before verify ⏳ NEEDS TESTING
+- `server/models/Verification.js` - userId made optional for unauthenticated flow ⏳ NEEDS TESTING
 
 ---
 
-### Current State Testing:
-1. [ ] Create thread locally
-2. [ ] Set username + password
-3. [ ] Verify sync uploads thread to server
-4. [ ] Delete app data
-5. [ ] Login with username
-6. [ ] Verify thread syncs back down
+### Bug: Email verification completes but email shows "not set" after
+- User has no username, verifies email via unauthenticated flow
+- Code verified successfully but UI reverts to "not set"
+- Server DB: ✅ User created with email `eyeclik@gmail.com`, JWT returned
+- Local DB: ❌ NOT CHECKED YET
+
+#### Root cause (2 issues):
+1. `useUpdateUser.onSuccess` called both `setQueryData` and `invalidateQueries` — race condition, background refetch can overwrite cache
+2. `setEditingField(null)` called BEFORE `await refetchUser()` — UI transitions before cache is fresh
+
+#### Fix attempt 1 (FAILED):
+- `hooks/useUser.ts` — removed `invalidateQueries` from `onSuccess`
+- `app/settings/profile.tsx` — reordered: `refetchUser()` before `setEditingField(null)`, added console.log traces
+- Result: Still shows "not set" — but email IS in SQLite (shows after app restart)
+- Conclusion: SQLite write works, React Query cache is not updating the component
+
+#### Fix attempt 2 (FAILED):
+- Used `queryClient.setQueryData` with updater `(old) => old ? {...old, email} : old`
+- Still doesn't work — `old` is likely `null` because `onSuccess` already set cache to null
+- Phone verification also has the same issue
+
+#### Fix attempt 3 (FAILED):
+- Made `onSuccess` skip setting cache when mutation returns null
+- Used `{...user, email: result.user.email}` with component's user ref directly
+- Still same issue — phone verification also fails the same way
+- Shows correctly only after closing and reopening app
+- Status: ❌ NOT FIXED
+
+---
+### Bug: similar you assuming idiot
+now focus on thread screen - when a new thread is created - focus is on thread name - i change and mark done (system keyboard) and the change is saved and reflected. If i go to thread info page and edit name there - change doesnt show. I come back to homescreen and pull down to refresh - then name on home screen updates. But the thread screen still has old name - because there is no pull to refresh there. so i close the app and open it - and name is updated. sound familiar you negro? 
+
+### Sync push: merge by chat name (reinstall scenario)
+- When client pushes a **new** chat (no serverId) and the user already has a chat with the **same name**, server returns that existing chat’s serverId instead of creating a duplicate.
+- Messages in the push that reference the local chat id then map to the existing thread, so notes merge into one thread.
+- Implemented in `server/routes/sync.js` (POST /sync/push). Chat and Message schemas have `deletedAt` for soft delete.
+
+### Potential Bug: Sync push overwrites server fields with null
+- `server/routes/sync.js:154` — `User.findByIdAndUpdate` sets ALL fields from local data
+- Local `username: null` could overwrite a real server username
+- Status: ❌ NOT FIXED
+

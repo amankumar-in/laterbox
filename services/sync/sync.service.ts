@@ -308,11 +308,48 @@ export class SyncService {
       const pendingMessages = await messageRepo.getPendingSync()
       const pendingUser = await userRepo.getPendingSync()
 
-      if (
-        pendingChats.length === 0 &&
-        pendingMessages.length === 0 &&
-        !pendingUser
-      ) {
+      // Include chats referenced by pending messages so server can resolve chatLocalId
+      const pendingChatIds = new Set(pendingChats.map((c) => c.id))
+      const referencedChatIds = [
+        ...new Set(pendingMessages.map((m) => m.chat_id)),
+      ].filter((id) => !pendingChatIds.has(id))
+      const referencedChats = (
+        await Promise.all(
+          referencedChatIds.map((id) => chatRepo.getRowById(id))
+        )
+      ).filter((c): c is ChatRow => c != null)
+      // Include any chat that has never been synced (no server_id) so we always send it
+      const neverSyncedChats = await chatRepo.getNeverSynced()
+      const alreadyIncluded = new Set([
+        ...pendingChatIds,
+        ...referencedChats.map((c) => c.id),
+      ])
+      const extraNeverSynced = neverSyncedChats.filter((c) => !alreadyIncluded.has(c.id))
+      const chatsToSend = [...pendingChats, ...referencedChats, ...extraNeverSynced]
+
+      // #region agent log
+      fetch('http://127.0.0.1:7245/ingest/909ea40f-d299-4969-83a5-58f6881ded01', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H1',
+          location: 'services/sync/sync.service.ts:312',
+          message: 'Pending entities before push',
+          data: {
+            pendingChatCount: pendingChats.length,
+            pendingMessageCount: pendingMessages.length,
+            hasPendingUser: !!pendingUser,
+            pendingChatServerIds: pendingChats.map((c) => c.server_id || null),
+            pendingChatSyncStatus: pendingChats.map((c) => c.sync_status)
+          },
+          timestamp: Date.now()
+        })
+      }).catch(() => {})
+      // #endregion
+
+      if (!pendingUser && chatsToSend.length === 0 && pendingMessages.length === 0) {
         console.log('[Sync] No pending changes to push')
         return
       }
@@ -325,7 +362,7 @@ export class SyncService {
               data: this.mapUserToServer(pendingUser),
             }
           : undefined,
-        chats: pendingChats.map((chat) => ({
+        chats: chatsToSend.map((chat) => ({
           localId: chat.id,
           serverId: chat.server_id,
           data: this.mapChatToServer(chat),

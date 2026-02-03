@@ -151,14 +151,23 @@ router.post('/push', authenticate, asyncHandler(async (req, res) => {
       }
     }
 
-    await User.findByIdAndUpdate(userId, {
+    const updatePayload = {
       name: data.name,
-      username: data.username,
-      email: data.email,
-      phone: data.phone,
       avatar: data.avatar,
       settings: data.settings,
-    });
+    };
+
+    if (data.username) {
+      updatePayload.username = data.username.toLowerCase();
+    }
+    if (data.email) {
+      updatePayload.email = data.email.toLowerCase();
+    }
+    if (data.phone) {
+      updatePayload.phone = data.phone;
+    }
+
+    await User.findByIdAndUpdate(userId, updatePayload);
 
     result.user = {
       localId,
@@ -166,7 +175,7 @@ router.post('/push', authenticate, asyncHandler(async (req, res) => {
     };
   }
 
-  // Process chat changes
+  // Process chat changes (with merge: new chat with same name as existing → use existing)
   if (chatChanges && chatChanges.length > 0) {
     for (const { localId, serverId, data, deleted } of chatChanges) {
       if (deleted) {
@@ -184,27 +193,51 @@ router.post('/push', authenticate, asyncHandler(async (req, res) => {
         }
         result.chats.push({ localId, serverId: serverId || localId });
       } else if (serverId) {
-        // Update existing chat
-        await Chat.findOneAndUpdate(
-          { _id: serverId, ownerId: userId },
-          {
+        // Update existing chat if it exists; otherwise create (client had stale/wrong serverId)
+        const existing = await Chat.findOne({ _id: serverId, ownerId: userId }).lean();
+        if (existing) {
+          await Chat.findOneAndUpdate(
+            { _id: serverId, ownerId: userId },
+            {
+              name: data.name,
+              icon: data.icon,
+              isPinned: data.isPinned,
+              wallpaper: data.wallpaper,
+            }
+          );
+          result.chats.push({ localId, serverId });
+        } else {
+          const chat = await Chat.create({
             name: data.name,
             icon: data.icon,
             isPinned: data.isPinned,
             wallpaper: data.wallpaper,
-          }
-        );
-        result.chats.push({ localId, serverId });
+            ownerId: userId,
+          });
+          result.chats.push({ localId, serverId: chat._id.toString() });
+        }
       } else {
-        // Create new chat
-        const chat = await Chat.create({
-          name: data.name,
-          icon: data.icon,
-          isPinned: data.isPinned,
-          wallpaper: data.wallpaper,
-          ownerId: userId,
-        });
-        result.chats.push({ localId, serverId: chat._id.toString() });
+        // New chat (no serverId): merge into existing chat with same name if any (reinstall scenario)
+        const nameTrimmed = data.name && typeof data.name === 'string' ? data.name.trim() : '';
+        const existing = nameTrimmed
+          ? await Chat.findOne({
+              ownerId: userId,
+              name: nameTrimmed,
+              $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+            }).lean()
+          : null;
+        if (existing) {
+          result.chats.push({ localId, serverId: existing._id.toString() });
+        } else {
+          const chat = await Chat.create({
+            name: data.name,
+            icon: data.icon,
+            isPinned: data.isPinned,
+            wallpaper: data.wallpaper,
+            ownerId: userId,
+          });
+          result.chats.push({ localId, serverId: chat._id.toString() });
+        }
       }
     }
   }

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { FlatList, Alert, ActivityIndicator } from 'react-native'
+import { FlatList, Alert, ActivityIndicator, RefreshControl } from 'react-native'
 import { YStack, XStack, Text, Separator, Button } from 'tamagui'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -18,6 +18,8 @@ import {
 } from '../hooks/useChats'
 import { useExportChat } from '../hooks/useExportChat'
 import { useShortcuts } from '../hooks/useShortcuts'
+import { useUser } from '../hooks/useUser'
+import { useSyncService } from '../hooks/useSyncService'
 import { useThemeColor } from '../hooks/useThemeColor'
 import type { ChatWithLastMessage, ChatFilter } from '../types'
 
@@ -49,8 +51,21 @@ export default function HomeScreen() {
   const deleteChat = useDeleteChat()
   const { exportChat, isExporting } = useExportChat()
   const { addShortcut } = useShortcuts()
+  const { data: user } = useUser()
+  const { pull } = useSyncService()
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
+  const hasIdentity = !!(user?.username || user?.email || user?.phone)
   const chats = data?.data ?? []
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true)
+    if (hasIdentity) {
+      await pull().catch(() => {})
+    }
+    refetch()
+    setIsRefreshing(false)
+  }, [hasIdentity, pull, refetch])
 
   const handleChatPress = useCallback(
     (chat: ChatWithLastMessage) => {
@@ -275,8 +290,12 @@ export default function HomeScreen() {
           )}
           ItemSeparatorComponent={() => <Separator marginLeft={76} />}
           contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
-          refreshing={isLoading}
-          onRefresh={refetch}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading || isRefreshing}
+              onRefresh={handleRefresh}
+            />
+          }
         />
 
         <FAB icon="add" onPress={handleCreateChat} disabled={createChat.isPending} />

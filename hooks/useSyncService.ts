@@ -46,6 +46,7 @@ export function useSyncService(): SyncServiceHook {
 
   const push = useCallback(async () => {
     await syncService.push()
+    invalidateAllQueries()
   }, [syncService])
 
   const schedulePush = useCallback(() => {
