@@ -16,7 +16,10 @@ import type { Chat, Message, MessageType } from '../../../types'
 
 export default function ChatScreen() {
   const router = useRouter()
-  const { id, new: isNew } = useLocalSearchParams<{ id: string; new?: string }>()
+  const params = useLocalSearchParams<{ id: string; new?: string; messageId?: string }>()
+  const id = Array.isArray(params.id) ? params.id[0] : params.id
+  const isNew = Array.isArray(params.new) ? params.new[0] : params.new
+  const targetMessageId = Array.isArray(params.messageId) ? params.messageId[0] : params.messageId
   const insets = useSafeAreaInsets()
   const [editingMessage, setEditingMessage] = useState<Message | null>(null)
   const [showAttachments, setShowAttachments] = useState(false)
@@ -31,6 +34,9 @@ export default function ChatScreen() {
 
   // Selection state
   const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set())
+
+  // Flash highlight state (for navigating from tasks page)
+  const [flashMessageId, setFlashMessageId] = useState<string | undefined>(undefined)
 
   // Date picker state for reminders
   const [showDatePicker, setShowDatePicker] = useState(false)
@@ -64,6 +70,17 @@ export default function ChatScreen() {
     return messages.filter((m) => m.task.isTask && !m.task.isCompleted).length
   }, [messages])
 
+  // Flash highlight for navigating from tasks page
+  useEffect(() => {
+    if (targetMessageId) {
+      setFlashMessageId(targetMessageId)
+      const timer = setTimeout(() => {
+        setFlashMessageId(undefined)
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [targetMessageId])
+
   // Search results - find messages matching query
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return []
@@ -74,9 +91,13 @@ export default function ChatScreen() {
   }, [messages, searchQuery])
 
   const highlightedMessageId = useMemo(() => {
-    if (searchResults.length === 0) return undefined
-    return searchResults[searchResultIndex]?._id
-  }, [searchResults, searchResultIndex])
+    // Prioritize search results when searching
+    if (searchResults.length > 0) {
+      return searchResults[searchResultIndex]?._id
+    }
+    // Otherwise use flashMessageId from navigation (e.g., from tasks page)
+    return flashMessageId
+  }, [searchResults, searchResultIndex, flashMessageId])
 
   const handleBack = useCallback(() => {
     router.back()
@@ -118,8 +139,9 @@ export default function ChatScreen() {
   }, [searchResults.length])
 
   const handleTasks = useCallback(() => {
-    router.push('/tasks')
-  }, [router])
+    const chatName = encodeURIComponent(chat?.name || 'Thread')
+    router.push(`/tasks?chatId=${id}&chatName=${chatName}`)
+  }, [router, id, chat?.name])
 
   const handleMenu = useCallback(() => {
     console.log('Menu:', id)
@@ -301,6 +323,7 @@ export default function ChatScreen() {
         messageId: message._id,
         isTask: true,
         reminderAt: message.task.reminderAt,
+        isCompleted: false,
       })
     }
   }, [completeTaskMutation, setMessageTaskMutation])

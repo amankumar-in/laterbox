@@ -9,7 +9,7 @@ const router = express.Router();
 /**
  * Middleware to validate chat access
  */
-async function validateChatAccess(req, res, next) {
+const validateChatAccess = asyncHandler(async (req, res, next) => {
   const chat = await Chat.findById(req.params.chatId);
 
   if (!chat) {
@@ -28,7 +28,7 @@ async function validateChatAccess(req, res, next) {
 
   req.chat = chat;
   next();
-}
+});
 
 /**
  * GET /api/chats/:chatId/messages
@@ -296,9 +296,16 @@ router.put('/:chatId/messages/:id/task', authenticate, validateChatAccess, async
     });
   }
 
+  const { isCompleted } = req.body;
+
   message.task.isTask = isTask !== undefined ? isTask : true;
   if (reminderAt) {
     message.task.reminderAt = new Date(reminderAt);
+  }
+  // Allow explicitly setting isCompleted to false (uncomplete a task)
+  if (isCompleted === false) {
+    message.task.isCompleted = false;
+    message.task.completedAt = null;
   }
   if (!isTask) {
     message.task.reminderAt = null;

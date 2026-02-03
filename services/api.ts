@@ -178,7 +178,7 @@ export async function starMessage(
 export async function setMessageTask(
   chatId: string,
   messageId: string,
-  data: { isTask: boolean; reminderAt?: string }
+  data: { isTask: boolean; reminderAt?: string; isCompleted?: boolean }
 ): Promise<Message> {
   const api = await getApi()
   const response = await api.put(`/chats/${chatId}/messages/${messageId}/task`, data)

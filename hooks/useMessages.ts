@@ -100,11 +100,13 @@ export function useSetMessageTask(chatId: string) {
       messageId,
       isTask,
       reminderAt,
+      isCompleted,
     }: {
       messageId: string
       isTask: boolean
       reminderAt?: string
-    }) => setMessageTask(chatId, messageId, { isTask, reminderAt }),
+      isCompleted?: boolean
+    }) => setMessageTask(chatId, messageId, { isTask, reminderAt, isCompleted }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['messages', chatId] })
       queryClient.invalidateQueries({ queryKey: ['tasks'] })

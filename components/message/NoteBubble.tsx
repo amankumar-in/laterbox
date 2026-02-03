@@ -218,7 +218,7 @@ export function NoteBubble({ message, onLongPress, onPress, onTaskToggle, isHigh
 
           <XStack justifyContent="flex-end" alignItems="center" gap="$1" marginTop="$1">
             {message.isLocked && (
-              <Ionicons name="lock-closed" size={12} color="rgba(255,255,255,0.7)" />
+              <Ionicons name="lock-closed" size={12} color={brandText} />
             )}
             {message.isEdited && (
               <Text fontSize={10} color="$blue12" marginRight="$1">
@@ -239,7 +239,7 @@ export function NoteBubble({ message, onLongPress, onPress, onTaskToggle, isHigh
               borderTopWidth={1}
               borderTopColor="$blue8"
             >
-              <Ionicons name="alarm" size={12} color="rgba(255,255,255,0.7)" />
+              <Ionicons name="alarm" size={12} color={brandText} />
               <Text fontSize={10} color="$blue12">
                 {new Date(message.task.reminderAt).toLocaleDateString(undefined, {
                   month: 'short',

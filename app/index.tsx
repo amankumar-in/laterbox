@@ -22,7 +22,7 @@ import { useThemeColor } from '../hooks/useThemeColor'
 import type { Chat, ChatFilter } from '../types'
 
 const FILTER_OPTIONS = [
-  { key: 'all', label: 'All' },
+  { key: 'threads', label: 'Threads' },
   { key: 'tasks', label: 'Tasks' },
 ]
 
@@ -31,7 +31,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets()
   const { iconColor } = useThemeColor()
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedFilter, setSelectedFilter] = useState<ChatFilter>('all')
+  const [selectedFilter, setSelectedFilter] = useState<ChatFilter>('threads')
 
   // API hooks
   const {
@@ -41,7 +41,7 @@ export default function HomeScreen() {
     refetch,
   } = useChats({
     search: searchQuery || undefined,
-    filter: selectedFilter === 'all' ? undefined : selectedFilter,
+    filter: undefined, // threads view shows all chats
   })
 
   const createChat = useCreateChat()
@@ -186,7 +186,13 @@ export default function HomeScreen() {
           <FilterChips
             options={FILTER_OPTIONS}
             selected={selectedFilter}
-            onSelect={(key) => setSelectedFilter(key as ChatFilter)}
+            onSelect={(key) => {
+              if (key === 'tasks') {
+                router.push('/tasks')
+              } else {
+                setSelectedFilter(key as ChatFilter)
+              }
+            }}
           />
           <YStack flex={1} justifyContent="center" alignItems="center" padding="$4">
             <Ionicons name="document-text-outline" size={64} color={iconColor} />
@@ -214,7 +220,13 @@ export default function HomeScreen() {
           <FilterChips
             options={FILTER_OPTIONS}
             selected={selectedFilter}
-            onSelect={(key) => setSelectedFilter(key as ChatFilter)}
+            onSelect={(key) => {
+              if (key === 'tasks') {
+                router.push('/tasks')
+              } else {
+                setSelectedFilter(key as ChatFilter)
+              }
+            }}
           />
           <YStack flex={1} justifyContent="center" alignItems="center" padding="$4">
             <Ionicons name="search-outline" size={64} color={iconColor} />
@@ -242,7 +254,13 @@ export default function HomeScreen() {
         <FilterChips
           options={FILTER_OPTIONS}
           selected={selectedFilter}
-          onSelect={(key) => setSelectedFilter(key as ChatFilter)}
+          onSelect={(key) => {
+            if (key === 'tasks') {
+              router.push('/tasks')
+            } else {
+              setSelectedFilter(key as ChatFilter)
+            }
+          }}
         />
 
         <FlatList

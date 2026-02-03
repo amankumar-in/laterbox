@@ -21,6 +21,7 @@ export interface Chat {
 export interface Message {
   _id: string
   chatId: string
+  chatName?: string // Populated by API when fetching tasks
   senderId: string
   content?: string
   type: MessageType
@@ -75,4 +76,4 @@ export interface User {
   updatedAt: string
 }
 
-export type ChatFilter = 'all' | 'tasks'
+export type ChatFilter = 'threads' | 'tasks'

@@ -178,8 +178,15 @@ messageSchema.statics.getTasks = async function (userId, options = {}) {
     .limit(limit)
     .lean();
 
+  // Transform to keep chatId as string and add chatName
+  const transformedTasks = tasks.map((task) => ({
+    ...task,
+    chatName: task.chatId?.name || 'Unknown',
+    chatId: task.chatId?._id || task.chatId,
+  }));
+
   return {
-    tasks,
+    tasks: transformedTasks,
     total,
     page,
     hasMore: page * limit < total,
