@@ -16,7 +16,7 @@ interface ChatHeaderProps {
 }
 
 const menuOptions = [
-  { id: 'media', icon: 'images', label: 'Media, Links, and Docs' },
+  { id: 'media', icon: 'images', label: 'Media Files' },
   { id: 'wallpaper', icon: 'color-palette', label: 'Chat Wallpaper' },
   { id: 'shortcut', icon: 'add-circle', label: 'Add Shortcut' },
   { id: 'export', icon: 'download', label: 'Export Chat' },
@@ -108,17 +108,17 @@ export function ChatHeader({
         {taskCount > 0 && (
           <XStack
             position="absolute"
-            top={4}
-            right={4}
+            top={6}
+            right={6}
             backgroundColor="$errorColor"
-            borderRadius={10}
-            minWidth={18}
-            height={18}
+            borderRadius={7}
+            minWidth={14}
+            height={14}
             alignItems="center"
             justifyContent="center"
-            paddingHorizontal="$1"
+            onPress={onTasks}
           >
-            <Text color={brandText} fontSize={10} fontWeight="700">
+            <Text color={brandText} fontSize={9} fontWeight="700">
               {taskCount > 99 ? '99+' : taskCount}
             </Text>
           </XStack>
@@ -144,6 +144,7 @@ export function ChatHeader({
           enterStyle={{ opacity: 0, y: -10 }}
           exitStyle={{ opacity: 0, y: -10 }}
           animation="quick"
+          right={0}
         >
           <YStack>
             {menuOptions.map((option) => (

@@ -79,6 +79,7 @@ export const tamaguiConfig = createTamagui({
       color: '#0f172a',
       colorSubtle: '#64748b',
       colorMuted: '#64748b',
+      placeholderColor: '#94a3b8',
       // Backgrounds
       background: '#ffffff',
       backgroundHover: '#f8fafc',
@@ -111,6 +112,7 @@ export const tamaguiConfig = createTamagui({
       color: '#f8fafc',
       colorSubtle: '#94a3b8',
       colorMuted: '#cbd5e1',
+      placeholderColor: '#64748b',
       // Backgrounds
       background: '#0f172a',
       backgroundHover: '#1e293b',

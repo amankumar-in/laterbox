@@ -8,6 +8,7 @@ export function useThemeColor() {
     color: theme.color?.get() as string,
     colorSubtle: theme.colorSubtle?.get() as string,
     colorMuted: theme.colorMuted?.get() as string,
+    placeholderColor: theme.placeholderColor?.get() as string,
     // Backgrounds
     background: theme.background?.get() as string,
     backgroundHover: theme.backgroundHover?.get() as string,

@@ -2,7 +2,6 @@ import { useState, useCallback } from 'react'
 import { XStack, YStack, Input, Button, Text } from 'tamagui'
 import { Ionicons } from '@expo/vector-icons'
 import { Keyboard } from 'react-native'
-import { useKeyboardState } from 'react-native-keyboard-controller'
 import { useThemeColor } from '../../hooks/useThemeColor'
 import type { Message, MessageType } from '../../types'
 
@@ -22,6 +21,8 @@ interface MessageInputProps {
   onVoiceEnd: (uri: string) => void
   editingMessage?: Message | null
   onCancelEdit?: () => void
+  showAttachments: boolean
+  onToggleAttachments: () => void
 }
 
 export function MessageInput({
@@ -31,13 +32,12 @@ export function MessageInput({
   onVoiceEnd,
   editingMessage,
   onCancelEdit,
+  showAttachments,
+  onToggleAttachments,
 }: MessageInputProps) {
-  const { iconColor, brandText } = useThemeColor()
+  const { iconColor, brandText, placeholderColor } = useThemeColor()
   const [text, setText] = useState('')
   const [isRecording, setIsRecording] = useState(false)
-  const [showAttachments, setShowAttachments] = useState(false)
-  const keyboard = useKeyboardState()
-  const isKeyboardOpen = keyboard.height > 0
 
   const handleSend = useCallback(() => {
     const trimmedText = text.trim()
@@ -62,14 +62,10 @@ export function MessageInput({
     }
   }, [isRecording, onVoiceEnd])
 
-  const handleAttachmentToggle = useCallback(() => {
-    setShowAttachments((prev) => !prev)
-  }, [])
-
   const handleAttachmentPress = useCallback((id: string) => {
-    setShowAttachments(false)
+    onToggleAttachments()
     onAttachmentSelect(id)
-  }, [onAttachmentSelect])
+  }, [onToggleAttachments, onAttachmentSelect])
 
   const hasText = text.trim().length > 0
 
@@ -113,7 +109,7 @@ export function MessageInput({
       borderTopColor="$borderColor"
       backgroundColor="$background"
     >
-      {!isKeyboardOpen && attachmentPanel}
+      {attachmentPanel}
 
       {editingMessage && (
         <XStack
@@ -145,7 +141,7 @@ export function MessageInput({
           size="$3"
           circular
           chromeless
-          onPress={handleAttachmentToggle}
+          onPress={onToggleAttachments}
           icon={<Ionicons name={showAttachments ? 'close' : 'add'} size={24} color={iconColor} />}
         />
 
@@ -158,11 +154,12 @@ export function MessageInput({
           alignItems="center"
         >
           <Input
+            key={placeholderColor}
             flex={1}
             borderWidth={0}
             backgroundColor="transparent"
             placeholder="Type a message..."
-            placeholderTextColor="$colorMuted"
+            placeholderTextColor={placeholderColor}
             value={text}
             onChangeText={setText}
             multiline
@@ -193,8 +190,6 @@ export function MessageInput({
           />
         )}
       </XStack>
-
-      {isKeyboardOpen && attachmentPanel}
 
       {isRecording && (
         <XStack

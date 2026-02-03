@@ -16,7 +16,7 @@ export function SearchBar({
   placeholder = 'Search',
   autoFocus = false,
 }: SearchBarProps) {
-  const { iconColor, colorMuted } = useThemeColor()
+  const { iconColor, placeholderColor } = useThemeColor()
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const handleChangeText = useCallback(
@@ -55,11 +55,12 @@ export function SearchBar({
     >
       <Ionicons name="search" size={20} color={iconColor} />
       <Input
+        key={placeholderColor}
         flex={1}
         borderWidth={0}
         backgroundColor="transparent"
         placeholder={placeholder}
-        placeholderTextColor={colorMuted}
+        placeholderTextColor={placeholderColor}
         defaultValue={value}
         onChangeText={handleChangeText}
         autoFocus={autoFocus}

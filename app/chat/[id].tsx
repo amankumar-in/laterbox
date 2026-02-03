@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { YStack } from 'tamagui'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { Alert } from 'react-native'
+import { Alert, Keyboard } from 'react-native'
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -102,6 +102,7 @@ export default function ChatScreen() {
   const [isLoading, setIsLoading] = useState(false)
   const [editingMessage, setEditingMessage] = useState<Message | null>(null)
   const [chat] = useState<Chat>(MOCK_CHAT)
+  const [showAttachments, setShowAttachments] = useState(false)
 
   const taskCount = useMemo(() => {
     return messages.filter((m) => m.task.isTask && !m.task.isCompleted).length
@@ -294,6 +295,11 @@ export default function ChatScreen() {
     console.log('Selected attachment:', type)
   }, [])
 
+  const handleToggleAttachments = useCallback(() => {
+    Keyboard.dismiss()
+    setShowAttachments((prev) => !prev)
+  }, [])
+
   
   const handleVoiceStart = useCallback(() => {
     console.log('Start voice recording')
@@ -309,17 +315,17 @@ export default function ChatScreen() {
 
   return (
     <YStack flex={1} backgroundColor="$background" paddingBottom={insets.bottom}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior="translate-with-padding">
-        <ChatHeader
-          chat={chat}
-          onBack={handleBack}
-          onChatPress={handleChatPress}
-          onSearch={handleSearch}
-          onTasks={handleTasks}
-          onMenu={handleMenu}
-          taskCount={taskCount}
-        />
+      <ChatHeader
+        chat={chat}
+        onBack={handleBack}
+        onChatPress={handleChatPress}
+        onSearch={handleSearch}
+        onTasks={handleTasks}
+        onMenu={handleMenu}
+        taskCount={taskCount}
+      />
 
+      <KeyboardAvoidingView style={{ flex: 1, overflow: 'hidden' }} behavior="padding">
         <MessageList
           messages={messages}
           onLoadMore={handleLoadMore}
@@ -336,6 +342,8 @@ export default function ChatScreen() {
           onVoiceEnd={handleVoiceEnd}
           editingMessage={editingMessage}
           onCancelEdit={handleCancelEdit}
+          showAttachments={showAttachments}
+          onToggleAttachments={handleToggleAttachments}
         />
       </KeyboardAvoidingView>
     </YStack>
