@@ -244,6 +244,55 @@ noteSchema.statics.searchNotes = async function (userId, searchQuery, options = 
   };
 };
 
+// Static method to get all locked (protected) notes across all user's threads
+noteSchema.statics.getProtectedNotes = async function (userId, options = {}) {
+  const { before, after, limit = 50 } = options;
+
+  const Thread = mongoose.model('Thread');
+  const userThreads = await Thread.find({
+    $or: [
+      { ownerId: userId },
+      { participants: userId },
+    ],
+  }).select('_id name');
+
+  const threadIds = userThreads.map((t) => t._id);
+  const threadMap = new Map(userThreads.map((t) => [t._id.toString(), t.name]));
+
+  const query = {
+    threadId: { $in: threadIds },
+    isLocked: true,
+    isDeleted: false,
+  };
+
+  if (before) {
+    query.createdAt = { $lt: new Date(before) };
+  } else if (after) {
+    query.createdAt = { $gt: new Date(after) };
+  }
+
+  const notes = await this.find(query)
+    .sort({ createdAt: -1 })
+    .limit(limit + 1)
+    .lean();
+
+  const hasMore = notes.length > limit;
+  if (hasMore) {
+    notes.pop();
+  }
+
+  // Add thread name to each note
+  const notesWithThreadName = notes.map((n) => ({
+    ...n,
+    threadName: n.originalThreadName || threadMap.get(n.threadId.toString()) || 'Unknown',
+  }));
+
+  return {
+    notes: notesWithThreadName.reverse(),
+    hasMore,
+  };
+};
+
 const Note = mongoose.model('Note', noteSchema);
 
 export default Note;

@@ -13,6 +13,9 @@ const router = express.Router();
 router.get('/', authenticate, asyncHandler(async (req, res) => {
   const { search, filter, page = 1, limit = 50 } = req.query;
 
+  // Ensure Protected Notes system thread exists
+  await Thread.getLockedNotesThread(req.user._id);
+
   const result = await Thread.getUserThreads(req.user._id, {
     search,
     filter,

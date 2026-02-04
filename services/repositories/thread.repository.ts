@@ -24,8 +24,8 @@ export class ThreadRepository {
     const now = getTimestamp()
 
     await this.db.runAsync(
-      `INSERT INTO threads (id, name, icon, is_pinned, sync_status, created_at, updated_at)
-       VALUES (?, ?, ?, 0, 'pending', ?, ?)`,
+      `INSERT INTO threads (id, name, icon, is_pinned, is_system_thread, sync_status, created_at, updated_at)
+       VALUES (?, ?, ?, 0, 0, 'pending', ?, ?)`,
       [id, input.name, input.icon ?? null, now, now]
     )
 
@@ -152,6 +152,15 @@ export class ThreadRepository {
    * Soft delete a thread
    */
   async delete(id: string): Promise<{ success: boolean; lockedNotesCount: number }> {
+    // Block deletion of system threads
+    const thread = await this.db.getFirstAsync<ThreadRow>(
+      `SELECT * FROM threads WHERE id = ?`,
+      [id]
+    )
+    if (thread?.is_system_thread) {
+      return { success: false, lockedNotesCount: 0 }
+    }
+
     // Count locked notes
     const lockedResult = await this.db.getFirstAsync<{ count: number }>(
       `SELECT COUNT(*) as count FROM notes
@@ -162,6 +171,15 @@ export class ThreadRepository {
 
     const now = getTimestamp()
 
+    // Move locked notes to Protected Notes thread before deleting
+    if (lockedNotesCount > 0) {
+      await this.db.runAsync(
+        `UPDATE notes SET thread_id = 'system-protected-notes', sync_status = 'pending', updated_at = ?
+         WHERE thread_id = ? AND is_locked = 1 AND deleted_at IS NULL`,
+        [now, id]
+      )
+    }
+
     // Soft delete the thread
     await this.db.runAsync(
       `UPDATE threads SET deleted_at = ?, sync_status = 'pending', updated_at = ?
@@ -169,7 +187,7 @@ export class ThreadRepository {
       [now, now, id]
     )
 
-    // Soft delete all non-locked notes
+    // Soft delete all non-locked notes (locked ones already moved)
     await this.db.runAsync(
       `UPDATE notes SET deleted_at = ?, sync_status = 'pending', updated_at = ?
        WHERE thread_id = ? AND is_locked = 0`,
@@ -294,6 +312,7 @@ export class ThreadRepository {
     name: string
     icon?: string
     isPinned: boolean
+    isSystemThread?: boolean
     wallpaper?: string
     lastNote?: {
       content: string
@@ -303,13 +322,38 @@ export class ThreadRepository {
     createdAt: string
     updatedAt: string
   }): Promise<void> {
+    const isSystem = serverThread.isSystemThread ? 1 : 0
+
+    // If server sends a system thread, merge with the local system-protected-notes row
+    if (serverThread.isSystemThread) {
+      const localSystem = await this.db.getFirstAsync<ThreadRow>(
+        `SELECT * FROM threads WHERE id = 'system-protected-notes'`
+      )
+      if (localSystem) {
+        await this.db.runAsync(
+          `UPDATE threads SET
+             server_id = ?, name = ?, icon = ?, is_pinned = ?,
+             sync_status = 'synced', updated_at = ?
+           WHERE id = 'system-protected-notes'`,
+          [
+            serverThread._id,
+            serverThread.name,
+            serverThread.icon ?? null,
+            fromBoolean(serverThread.isPinned),
+            serverThread.updatedAt,
+          ]
+        )
+        return
+      }
+    }
+
     const existing = await this.getByServerId(serverThread._id)
 
     if (existing) {
       // Update existing
       await this.db.runAsync(
         `UPDATE threads SET
-           name = ?, icon = ?, is_pinned = ?, wallpaper = ?,
+           name = ?, icon = ?, is_pinned = ?, is_system_thread = ?, wallpaper = ?,
            last_note_content = ?, last_note_type = ?, last_note_timestamp = ?,
            sync_status = 'synced', updated_at = ?
          WHERE server_id = ?`,
@@ -317,6 +361,7 @@ export class ThreadRepository {
           serverThread.name,
           serverThread.icon ?? null,
           fromBoolean(serverThread.isPinned),
+          isSystem,
           serverThread.wallpaper ?? null,
           serverThread.lastNote?.content ?? null,
           serverThread.lastNote?.type ?? null,
@@ -330,16 +375,17 @@ export class ThreadRepository {
       const id = generateUUID()
       await this.db.runAsync(
         `INSERT INTO threads (
-           id, server_id, name, icon, is_pinned, wallpaper,
+           id, server_id, name, icon, is_pinned, is_system_thread, wallpaper,
            last_note_content, last_note_type, last_note_timestamp,
            sync_status, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?)`,
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'synced', ?, ?)`,
         [
           id,
           serverThread._id,
           serverThread.name,
           serverThread.icon ?? null,
           fromBoolean(serverThread.isPinned),
+          isSystem,
           serverThread.wallpaper ?? null,
           serverThread.lastNote?.content ?? null,
           serverThread.lastNote?.type ?? null,
@@ -361,6 +407,7 @@ export class ThreadRepository {
       name: row.name,
       icon: row.icon,
       isPinned: toBoolean(row.is_pinned),
+      isSystemThread: toBoolean(row.is_system_thread),
       wallpaper: row.wallpaper,
       lastNote:
         row.last_note_content || row.last_note_type

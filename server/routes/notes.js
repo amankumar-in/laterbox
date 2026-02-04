@@ -37,6 +37,16 @@ const validateThreadAccess = asyncHandler(async (req, res, next) => {
 router.get('/:threadId/notes', authenticate, validateThreadAccess, asyncHandler(async (req, res) => {
   const { before, after, limit = 50 } = req.query;
 
+  // System thread with locked_notes type → aggregate all locked notes
+  if (req.thread.isSystemThread && req.thread.systemThreadType === 'locked_notes') {
+    const result = await Note.getProtectedNotes(req.user._id, {
+      before,
+      after,
+      limit: parseInt(limit),
+    });
+    return res.json(result);
+  }
+
   const result = await Note.getThreadNotes(req.thread._id, {
     before,
     after,

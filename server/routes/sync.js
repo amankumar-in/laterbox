@@ -48,6 +48,8 @@ router.get('/changes', authenticate, asyncHandler(async (req, res) => {
       name: thread.name,
       icon: thread.icon,
       isPinned: thread.isPinned,
+      isSystemThread: thread.isSystemThread || false,
+      systemThreadType: thread.systemThreadType || null,
       wallpaper: thread.wallpaper,
       lastNote: thread.lastNote,
       createdAt: thread.createdAt,
@@ -178,6 +180,13 @@ router.post('/push', authenticate, asyncHandler(async (req, res) => {
   // Process thread changes (with merge: new thread with same name as existing → use existing)
   if (threadChanges && threadChanges.length > 0) {
     for (const { localId, serverId, data, deleted } of threadChanges) {
+      // System threads merge with server-side system thread
+      if (data && data.isSystemThread) {
+        const systemThread = await Thread.getLockedNotesThread(userId);
+        result.threads.push({ localId, serverId: systemThread._id.toString() });
+        continue;
+      }
+
       if (deleted) {
         // Handle deletion
         if (serverId) {

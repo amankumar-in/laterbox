@@ -6,6 +6,14 @@ import { TextInput, Image } from 'react-native'
 import { useThemeColor } from '../../hooks/useThemeColor'
 import type { ThreadWithLastNote } from '../../types'
 
+function getInitials(name: string): string {
+  const words = name.trim().split(/\s+/)
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase()
+  }
+  return name.slice(0, 2).toUpperCase()
+}
+
 interface ThreadHeaderProps {
   thread: ThreadWithLastNote
   onBack: () => void
@@ -197,7 +205,7 @@ export function ThreadHeader({
             justifyContent="center"
           >
             <Text color={brandText} fontWeight="600" fontSize="$3">
-              {thread.name.slice(0, 2).toUpperCase()}
+              {getInitials(thread.name)}
             </Text>
           </XStack>
         )}

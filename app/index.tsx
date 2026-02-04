@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { FlatList, Alert, ActivityIndicator, RefreshControl } from 'react-native'
 import { YStack, XStack, Text, Separator, Button } from 'tamagui'
 import { useRouter } from 'expo-router'
@@ -8,8 +8,9 @@ import { Ionicons } from '@expo/vector-icons'
 import { Header } from '../components/Header'
 import { SearchBar } from '../components/SearchBar'
 import { FilterChips } from '../components/FilterChips'
-import { NoteListItem } from '../components/NoteListItem'
+import { ThreadListItem } from '../components/ThreadListItem'
 import { FAB } from '../components/FAB'
+import { ThreadActionBar } from '../components/thread/ThreadActionBar'
 import {
   useThreads,
   useCreateThread,
@@ -34,6 +35,9 @@ export default function HomeScreen() {
   const { iconColor } = useThemeColor()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedFilter, setSelectedFilter] = useState<ThreadFilter>('threads')
+  const [selectedThreadIds, setSelectedThreadIds] = useState<Set<string>>(new Set())
+
+  const isSelectionMode = selectedThreadIds.size > 0
 
   // API hooks
   const {
@@ -58,6 +62,37 @@ export default function HomeScreen() {
   const hasIdentity = !!(user?.username || user?.email || user?.phone)
   const threads = data?.data ?? []
 
+  const selectedThreads = useMemo(
+    () => threads.filter((t) => selectedThreadIds.has(t.id)),
+    [threads, selectedThreadIds]
+  )
+
+  const allPinned = useMemo(
+    () => selectedThreads.length > 0 && selectedThreads.every((t) => t.isPinned),
+    [selectedThreads]
+  )
+
+  const hasSystemThread = useMemo(
+    () => selectedThreads.some((t) => t.isSystemThread),
+    [selectedThreads]
+  )
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedThreadIds(new Set())
+  }, [])
+
+  const toggleThreadSelection = useCallback((threadId: string) => {
+    setSelectedThreadIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(threadId)) {
+        next.delete(threadId)
+      } else {
+        next.add(threadId)
+      }
+      return next
+    })
+  }, [])
+
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
     if (hasIdentity) {
@@ -69,69 +104,84 @@ export default function HomeScreen() {
 
   const handleThreadPress = useCallback(
     (thread: ThreadWithLastNote) => {
-      router.push(`/thread/${thread.id}`)
+      if (isSelectionMode) {
+        toggleThreadSelection(thread.id)
+      } else {
+        router.push(`/thread/${thread.id}`)
+      }
     },
-    [router]
+    [router, isSelectionMode, toggleThreadSelection]
   )
 
   const handleThreadLongPress = useCallback(
     (thread: ThreadWithLastNote) => {
-      Alert.alert(thread.name, 'Choose an action', [
-        {
-          text: thread.isPinned ? 'Unpin' : 'Pin',
-          onPress: () => {
-            updateThread.mutate({
-              id: thread.id,
-              data: { isPinned: !thread.isPinned },
-            })
-          },
-        },
-        {
-          text: 'Export',
-          onPress: async () => {
-            try {
-              await exportThread(thread.id, thread.name)
-            } catch {
-              Alert.alert('Export Failed', 'Could not export the thread.')
-            }
-          },
-        },
-        {
-          text: 'Add Shortcut',
-          onPress: async () => {
-            const success = await addShortcut(thread)
-            if (success) {
-              Alert.alert('Shortcut Added', `${thread.name} added to shortcuts.`)
-            } else {
-              Alert.alert('Failed', 'Could not add shortcut.')
-            }
-          },
-        },
+      if (!isSelectionMode) {
+        setSelectedThreadIds(new Set([thread.id]))
+      }
+    },
+    [isSelectionMode]
+  )
+
+  const handlePinSelected = useCallback(() => {
+    const shouldPin = !allPinned
+    selectedThreads.forEach((thread) => {
+      updateThread.mutate({
+        id: thread.id,
+        data: { isPinned: shouldPin },
+      })
+    })
+    handleClearSelection()
+  }, [selectedThreads, allPinned, updateThread, handleClearSelection])
+
+  const handleExportSelected = useCallback(async () => {
+    if (selectedThreads.length !== 1) {
+      Alert.alert('Export', 'Select a single thread to export.')
+      return
+    }
+    const thread = selectedThreads[0]
+    try {
+      await exportThread(thread.id, thread.name)
+    } catch {
+      Alert.alert('Export Failed', 'Could not export the thread.')
+    }
+    handleClearSelection()
+  }, [selectedThreads, exportThread, handleClearSelection])
+
+  const handleShortcutSelected = useCallback(async () => {
+    if (selectedThreads.length !== 1) {
+      Alert.alert('Shortcut', 'Select a single thread to add a shortcut.')
+      return
+    }
+    const thread = selectedThreads[0]
+    const success = await addShortcut(thread)
+    if (success) {
+      Alert.alert('Shortcut Added', `${thread.name} added to shortcuts.`)
+    } else {
+      Alert.alert('Failed', 'Could not add shortcut.')
+    }
+    handleClearSelection()
+  }, [selectedThreads, addShortcut, handleClearSelection])
+
+  const handleDeleteSelected = useCallback(() => {
+    const count = selectedThreads.length
+    Alert.alert(
+      'Delete Thread' + (count > 1 ? 's' : ''),
+      `Are you sure you want to delete ${count} thread${count > 1 ? 's' : ''}? Locked notes will be preserved.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            Alert.alert(
-              'Delete Thread',
-              'Are you sure? Locked notes will be preserved.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Delete',
-                  style: 'destructive',
-                  onPress: () => {
-                    deleteThread.mutate(thread.id)
-                  },
-                },
-              ]
-            )
+            selectedThreads.forEach((thread) => {
+              deleteThread.mutate(thread.id)
+            })
+            handleClearSelection()
           },
         },
-        { text: 'Cancel', style: 'cancel' },
-      ])
-    },
-    [updateThread, deleteThread, exportThread, addShortcut]
-  )
+      ]
+    )
+  }, [selectedThreads, deleteThread, handleClearSelection])
 
   const handleCreateThread = useCallback(async () => {
     try {
@@ -282,10 +332,11 @@ export default function HomeScreen() {
           data={threads}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <NoteListItem
+            <ThreadListItem
               thread={item}
               onPress={() => handleThreadPress(item)}
               onLongPress={() => handleThreadLongPress(item)}
+              isSelected={selectedThreadIds.has(item.id)}
             />
           )}
           ItemSeparatorComponent={() => <Separator marginLeft={76} />}
@@ -298,7 +349,20 @@ export default function HomeScreen() {
           }
         />
 
-        <FAB icon="add" onPress={handleCreateThread} disabled={createThread.isPending} />
+        {isSelectionMode ? (
+          <ThreadActionBar
+            selectedCount={selectedThreadIds.size}
+            onClose={handleClearSelection}
+            onPin={handlePinSelected}
+            onExport={handleExportSelected}
+            onShortcut={handleShortcutSelected}
+            onDelete={handleDeleteSelected}
+            allPinned={allPinned}
+            hideDelete={hasSystemThread}
+          />
+        ) : (
+          <FAB icon="add" onPress={handleCreateThread} disabled={createThread.isPending} />
+        )}
 
         {isExporting && (
           <XStack

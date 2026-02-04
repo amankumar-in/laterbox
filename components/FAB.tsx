@@ -16,8 +16,8 @@ export function FAB({ icon = 'add', onPress, disabled }: FABProps) {
   return (
     <Button
       position="absolute"
-      bottom={insets.bottom + 16}
-      right="$4"
+      bottom={insets.bottom + 66}
+      right={36}
       size="$6"
       circular
       backgroundColor="$brandBackground"

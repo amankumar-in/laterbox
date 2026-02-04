@@ -33,12 +33,20 @@ export function useExportThread() {
       const allNotes: string[] = []
       let hasMore = true
       let cursor: string | undefined
+      const isSystemThread = thread.isSystemThread
 
       while (hasMore) {
-        const result = await noteRepo.getByThread(threadId, { before: cursor, limit: 100 })
+        const result = isSystemThread
+          ? await noteRepo.getAllLocked({ before: cursor, limit: 100 })
+          : await noteRepo.getByThread(threadId, { before: cursor, limit: 100 })
         // Notes come newest first, we want oldest first for export
         const notesFormatted = result.data.reverse().map(note => {
-          const date = new Date(note.createdAt).toLocaleString()
+          const d = new Date(note.createdAt)
+          const day = d.getDate()
+          const month = d.toLocaleString('en-US', { month: 'short' })
+          const year = d.getFullYear()
+          const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+          const date = `${day} ${month} ${year}, ${time}`
           let content = note.content || ''
 
           if (note.type === 'image') content = '[Image]'
@@ -66,7 +74,7 @@ export function useExportThread() {
       // Build export text
       const exportText = [
         `# ${thread.name}`,
-        `Exported on ${new Date().toLocaleString()}`,
+        `Exported on ${new Date().getDate()} ${new Date().toLocaleString('en-US', { month: 'short' })} ${new Date().getFullYear()}`,
         `Total notes: ${allNotes.length}`,
         '',
         '---',

@@ -4,10 +4,11 @@ import { Ionicons } from '@expo/vector-icons'
 import { useThemeColor } from '../hooks/useThemeColor'
 import type { ThreadWithLastNote } from '../types'
 
-interface NoteListItemProps {
+interface ThreadListItemProps {
   thread: ThreadWithLastNote
   onPress: () => void
   onLongPress: () => void
+  isSelected?: boolean
 }
 
 function formatRelativeTime(dateString: string): string {
@@ -48,15 +49,14 @@ function getNotePreview(thread: ThreadWithLastNote): string {
 }
 
 function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((word) => word[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
+  const words = name.trim().split(/\s+/)
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase()
+  }
+  return name.slice(0, 2).toUpperCase()
 }
 
-export function NoteListItem({ thread, onPress, onLongPress }: NoteListItemProps) {
+export function ThreadListItem({ thread, onPress, onLongPress, isSelected }: ThreadListItemProps) {
   const { warningColor } = useThemeColor()
   const timestamp = thread.lastNote?.timestamp || thread.updatedAt
 
@@ -66,35 +66,53 @@ export function NoteListItem({ thread, onPress, onLongPress }: NoteListItemProps
       paddingVertical="$3"
       gap="$3"
       alignItems="center"
-      backgroundColor="$background"
+      backgroundColor={isSelected ? '$yellow4' : '$background'}
       pressStyle={{ backgroundColor: '$backgroundHover' }}
       onPress={onPress}
       onLongPress={onLongPress}
       cursor="pointer"
     >
-      {thread.icon && (thread.icon.startsWith('file://') || thread.icon.startsWith('content://')) ? (
-        <Image
-          source={{ uri: thread.icon }}
-          style={{ width: 48, height: 48, borderRadius: 24 }}
-        />
-      ) : (
-        <XStack
-          width={48}
-          height={48}
-          borderRadius={24}
-          backgroundColor="$backgroundTinted"
-          alignItems="center"
-          justifyContent="center"
-        >
-          {thread.icon ? (
-            <Text fontSize="$5">{thread.icon}</Text>
-          ) : (
-            <Text color="$accentColor" fontWeight="600">
-              {getInitials(thread.name)}
-            </Text>
-          )}
-        </XStack>
-      )}
+      <XStack width={48} height={48} position="relative">
+        {thread.icon && (thread.icon.startsWith('file://') || thread.icon.startsWith('content://')) ? (
+          <Image
+            source={{ uri: thread.icon }}
+            style={{ width: 48, height: 48, borderRadius: 24 }}
+          />
+        ) : (
+          <XStack
+            width={48}
+            height={48}
+            borderRadius={24}
+            backgroundColor="$backgroundTinted"
+            alignItems="center"
+            justifyContent="center"
+          >
+            {thread.icon ? (
+              <Text fontSize="$5">{thread.icon}</Text>
+            ) : (
+              <Text color="$accentColor" fontWeight="600">
+                {getInitials(thread.name)}
+              </Text>
+            )}
+          </XStack>
+        )}
+        {isSelected && (
+          <XStack
+            position="absolute"
+            top={0}
+            left={0}
+            width={48}
+            height={48}
+            borderRadius={24}
+            backgroundColor="$accentColor"
+            opacity={0.85}
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Ionicons name="checkmark" size={24} color="#fff" />
+          </XStack>
+        )}
+      </XStack>
 
       <YStack flex={1} gap="$1">
         <XStack justifyContent="space-between" alignItems="center">

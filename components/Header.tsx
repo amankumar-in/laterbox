@@ -40,9 +40,14 @@ export function Header({ title, leftIcon, rightIcon }: HeaderProps) {
         )}
       </XStack>
 
-      <Text fontSize="$7" fontWeight="700" color="$accentColor" textTransform="lowercase">
-        {title}
-      </Text>
+      <XStack>
+        <Text fontSize="$7" fontWeight="700" color="$color" textTransform="lowercase">
+          mne
+        </Text>
+        <Text fontSize="$7" fontWeight="700" color="$accentColor" textTransform="lowercase">
+          me
+        </Text>
+      </XStack>
 
       <XStack width={44} justifyContent="flex-end">
         {rightIcon && (

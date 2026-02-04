@@ -1,11 +1,11 @@
 import '../tamagui-web.css'
 
 import { useEffect } from 'react'
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
+import { DarkTheme, DefaultTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native'
 import { Stack, useRouter } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useColorScheme } from 'react-native'
-import { TamaguiProvider } from 'tamagui'
+import { TamaguiProvider, Theme } from 'tamagui'
 import { PortalProvider } from '@tamagui/portal'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
@@ -23,6 +23,7 @@ import {
 
 import { tamaguiConfig } from '../tamagui.config'
 import { DatabaseProvider } from '@/contexts/DatabaseContext'
+import { ThemeProvider, useAppTheme } from '@/contexts/ThemeContext'
 import { useInitializeLocalUser } from '@/hooks/useUser'
 import { useAutoSync } from '@/hooks/useSyncService'
 
@@ -67,17 +68,29 @@ function AppContent() {
     return () => subscription?.remove()
   }, [router])
 
+  return <Stack screenOptions={{ headerShown: false }} />
+}
+
+function ThemedRoot() {
+  const { resolvedTheme } = useAppTheme()
+
   return (
-    <>
-      <Stack screenOptions={{ headerShown: false }} />
-      <StatusBar style="auto" translucent />
-    </>
+    <TamaguiProvider config={tamaguiConfig} defaultTheme={resolvedTheme}>
+      <Theme name={resolvedTheme}>
+        <StatusBar style={resolvedTheme === 'dark' ? 'light' : 'dark'} translucent />
+        <PortalProvider shouldAddRootHost>
+          <NavigationThemeProvider value={resolvedTheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <DatabaseProvider>
+              <AppContent />
+            </DatabaseProvider>
+          </NavigationThemeProvider>
+        </PortalProvider>
+      </Theme>
+    </TamaguiProvider>
   )
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme()
-
   const [fontsLoaded] = useFonts({
     Inter: Inter_400Regular,
     InterMedium: Inter_500Medium,
@@ -87,8 +100,6 @@ export default function RootLayout() {
     InterBlack: Inter_900Black,
   })
 
-  const theme = colorScheme || 'light'
-
   if (!fontsLoaded) {
     return null
   }
@@ -97,15 +108,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <KeyboardProvider>
         <QueryClientProvider client={queryClient}>
-          <TamaguiProvider config={tamaguiConfig} defaultTheme={theme}>
-            <PortalProvider shouldAddRootHost>
-              <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                <DatabaseProvider>
-                  <AppContent />
-                </DatabaseProvider>
-              </ThemeProvider>
-            </PortalProvider>
-          </TamaguiProvider>
+          <ThemeProvider>
+            <ThemedRoot />
+          </ThemeProvider>
         </QueryClientProvider>
       </KeyboardProvider>
     </SafeAreaProvider>

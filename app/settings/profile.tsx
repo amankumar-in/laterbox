@@ -25,6 +25,14 @@ import {
 } from '../../services/api'
 import { useSyncService } from '../../hooks/useSyncService'
 
+function getInitials(name: string): string {
+  const words = name.trim().split(/\s+/)
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase()
+  }
+  return name.slice(0, 2).toUpperCase()
+}
+
 const countryCodeToEmoji = (code: string) => {
   const codePoints = code
     .toUpperCase()
@@ -512,7 +520,7 @@ export default function ProfileScreen() {
                 ) : (
                   <XStack width={90} height={90} borderRadius={45} backgroundColor="$brandBackground" alignItems="center" justifyContent="center">
                     <Text color={brandText} fontSize="$7" fontWeight="600">
-                      {(user?.name || 'Me').slice(0, 2).toUpperCase()}
+                      {getInitials(user?.name || 'Me')}
                     </Text>
                   </XStack>
                 )}

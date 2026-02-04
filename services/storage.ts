@@ -6,6 +6,19 @@ import { DATABASE_NAME } from './database/schema'
 const DEVICE_ID_KEY = '@mneme:deviceId'
 const USER_KEY = '@mneme:user'
 const AUTH_TOKEN_KEY = '@mneme:authToken'
+const THEME_KEY = '@mneme:appTheme'
+
+export type AppTheme = 'light' | 'dark' | 'system'
+
+export async function getAppTheme(): Promise<AppTheme> {
+  const stored = await AsyncStorage.getItem(THEME_KEY)
+  if (stored === 'light' || stored === 'dark' || stored === 'system') return stored
+  return 'system'
+}
+
+export async function setAppTheme(theme: AppTheme): Promise<void> {
+  await AsyncStorage.setItem(THEME_KEY, theme)
+}
 
 function generateId(): string {
   const timestamp = Date.now().toString(36)
@@ -56,7 +69,7 @@ export async function clearAuthToken(): Promise<void> {
 }
 
 export async function clearAll(): Promise<void> {
-  await AsyncStorage.multiRemove([DEVICE_ID_KEY, USER_KEY, AUTH_TOKEN_KEY])
+  await AsyncStorage.multiRemove([DEVICE_ID_KEY, USER_KEY, AUTH_TOKEN_KEY, THEME_KEY])
 }
 
 /**

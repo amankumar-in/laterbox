@@ -20,6 +20,8 @@ interface ServerThread {
   name: string
   icon?: string
   isPinned: boolean
+  isSystemThread?: boolean
+  systemThreadType?: string | null
   wallpaper?: string
   lastNote?: {
     content: string
@@ -451,6 +453,7 @@ export class SyncService {
       name: thread.name,
       icon: thread.icon,
       isPinned: thread.is_pinned === 1,
+      isSystemThread: thread.is_system_thread === 1,
       wallpaper: thread.wallpaper,
     }
   }

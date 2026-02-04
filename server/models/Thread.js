@@ -91,7 +91,7 @@ threadSchema.statics.getLockedNotesThread = async function (userId) {
 
   if (!lockedThread) {
     lockedThread = await this.create({
-      name: 'Locked Notes',
+      name: 'Protected Notes',
       icon: '🔒',
       ownerId: userId,
       isSystemThread: true,

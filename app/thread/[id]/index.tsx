@@ -46,7 +46,7 @@ export default function ThreadScreen() {
   // API hooks
   const threadId = id || ''
   const { data: thread, isLoading: threadLoading } = useThread(threadId)
-  const { data: notesData, isLoading: notesLoading, fetchNextPage, hasNextPage } = useNotes(threadId)
+  const { data: notesData, isLoading: notesLoading, fetchNextPage, hasNextPage } = useNotes(threadId, { isSystemThread: thread?.isSystemThread })
   const updateThread = useUpdateThread()
   const sendNoteMutation = useSendNote(threadId)
   const updateNoteMutation = useUpdateNote(threadId)
@@ -357,6 +357,7 @@ export default function ThreadScreen() {
     name: editedName || 'New Thread',
     icon: null,
     isPinned: false,
+    isSystemThread: false,
     wallpaper: null,
     lastNote: null,
     syncStatus: 'pending',

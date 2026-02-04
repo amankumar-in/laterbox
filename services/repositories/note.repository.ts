@@ -137,6 +137,48 @@ export class NoteRepository {
   }
 
   /**
+   * Get all locked notes across all threads (for Protected Notes system thread)
+   */
+  async getAllLocked(
+    cursor?: NoteCursor
+  ): Promise<PaginatedResult<NoteWithDetails>> {
+    const limit = cursor?.limit ?? 50
+
+    let whereClause = 'WHERE n.is_locked = 1 AND n.deleted_at IS NULL'
+    const queryParams: (string | number)[] = []
+
+    if (cursor?.before) {
+      whereClause += ' AND n.created_at < ?'
+      queryParams.push(cursor.before)
+    }
+    if (cursor?.after) {
+      whereClause += ' AND n.created_at > ?'
+      queryParams.push(cursor.after)
+    }
+
+    const countResult = await this.db.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) as count FROM notes n ${whereClause}`,
+      queryParams
+    )
+    const total = countResult?.count ?? 0
+
+    const rows = await this.db.getAllAsync<NoteRow>(
+      `SELECT n.*, t.name as thread_name
+       FROM notes n
+       LEFT JOIN threads t ON n.thread_id = t.id
+       ${whereClause}
+       ORDER BY n.created_at DESC
+       LIMIT ?`,
+      [...queryParams, limit + 1]
+    )
+
+    const hasMore = rows.length > limit
+    const notes = rows.slice(0, limit).map((row) => this.mapToNote(row))
+
+    return { data: notes, hasMore, total }
+  }
+
+  /**
    * Update a note
    */
   async update(id: string, input: UpdateNoteInput): Promise<NoteWithDetails | null> {
@@ -178,6 +220,9 @@ export class NoteRepository {
        WHERE id = ?`,
       [fromBoolean(isLocked), now, id]
     )
+
+    // Update Protected Notes thread's lastNote with the most recent locked note
+    await this.updateProtectedNotesLastNote(now)
 
     return this.getById(id)
   }
@@ -554,6 +599,38 @@ export class NoteRepository {
           serverNote.createdAt,
           serverNote.updatedAt,
         ]
+      )
+    }
+  }
+
+  /**
+   * Update the Protected Notes system thread's lastNote with the most recent locked note
+   */
+  private async updateProtectedNotesLastNote(now: string): Promise<void> {
+    const latest = await this.db.getFirstAsync<{
+      content: string | null
+      type: string | null
+      created_at: string | null
+    }>(
+      `SELECT content, type, created_at FROM notes
+       WHERE is_locked = 1 AND deleted_at IS NULL
+       ORDER BY created_at DESC LIMIT 1`
+    )
+
+    if (latest) {
+      await this.db.runAsync(
+        `UPDATE threads SET
+           last_note_content = ?, last_note_type = ?, last_note_timestamp = ?, updated_at = ?
+         WHERE id = 'system-protected-notes'`,
+        [latest.content, latest.type, latest.created_at, now]
+      )
+    } else {
+      // No locked notes — clear lastNote
+      await this.db.runAsync(
+        `UPDATE threads SET
+           last_note_content = NULL, last_note_type = NULL, last_note_timestamp = NULL, updated_at = ?
+         WHERE id = 'system-protected-notes'`,
+        [now]
       )
     }
   }

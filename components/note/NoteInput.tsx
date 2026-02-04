@@ -60,7 +60,6 @@ export function NoteInput({
     if (trimmedText) {
       onSend({ content: trimmedText, type: 'text' })
       setText('')
-      Keyboard.dismiss()
     }
   }, [text, onSend])
 

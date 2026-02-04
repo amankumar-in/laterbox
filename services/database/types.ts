@@ -10,6 +10,7 @@ export interface ThreadRow {
   name: string
   icon: string | null
   is_pinned: number
+  is_system_thread: number
   wallpaper: string | null
   last_note_content: string | null
   last_note_type: string | null
@@ -84,6 +85,7 @@ export interface LocalThread extends SyncableEntity {
   name: string
   icon: string | null
   isPinned: number // SQLite doesn't have boolean, use 0/1
+  isSystemThread: number
   wallpaper: string | null
   lastNoteContent: string | null
   lastNoteType: NoteType | null
@@ -190,6 +192,7 @@ export interface ThreadWithLastNote {
   name: string
   icon: string | null
   isPinned: boolean
+  isSystemThread: boolean
   wallpaper: string | null
   lastNote: {
     content: string

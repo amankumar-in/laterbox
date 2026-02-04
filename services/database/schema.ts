@@ -1,6 +1,6 @@
 // SQLite schema definitions for offline-first architecture
 
-export const DATABASE_VERSION = 1
+export const DATABASE_VERSION = 2
 export const DATABASE_NAME = 'mneme.db'
 
 // Schema for version 1
@@ -15,6 +15,7 @@ export const SCHEMA_V1 = `
     name TEXT NOT NULL,
     icon TEXT,
     is_pinned INTEGER NOT NULL DEFAULT 0,
+    is_system_thread INTEGER NOT NULL DEFAULT 0,
     wallpaper TEXT,
     last_note_content TEXT,
     last_note_type TEXT,
@@ -136,13 +137,18 @@ export const SCHEMA_V1 = `
 
   -- Initialize sync_meta with single row
   INSERT OR IGNORE INTO sync_meta (id) VALUES (1);
+
+  -- Create Protected Notes system thread
+  INSERT OR IGNORE INTO threads (id, name, icon, is_pinned, is_system_thread, sync_status, created_at, updated_at)
+  VALUES ('system-protected-notes', 'Protected Notes', '🔒', 0, 1, 'pending', datetime('now'), datetime('now'));
 `
 
 // Migrations for future versions
 export const MIGRATIONS: Record<number, string> = {
-  // Example for future migration:
-  // 2: `
-  //   ALTER TABLE threads ADD COLUMN new_field TEXT;
-  //   -- other migration statements
-  // `
+  2: `
+    ALTER TABLE threads ADD COLUMN is_system_thread INTEGER NOT NULL DEFAULT 0;
+
+    INSERT OR IGNORE INTO threads (id, name, icon, is_pinned, is_system_thread, sync_status, created_at, updated_at)
+    VALUES ('system-protected-notes', 'Protected Notes', '🔒', 0, 1, 'pending', datetime('now'), datetime('now'));
+  `,
 }

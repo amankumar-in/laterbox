@@ -4,7 +4,7 @@ import { getNoteRepository, getThreadRepository } from '@/services/repositories'
 import { useSyncService } from './useSyncService'
 import type { NoteWithDetails, PaginatedResult, NoteType } from '@/services/database/types'
 
-export function useNotes(threadId: string, params?: { limit?: number }) {
+export function useNotes(threadId: string, params?: { limit?: number; isSystemThread?: boolean }) {
   const db = useDb()
   const noteRepo = getNoteRepository(db)
   const limit = params?.limit ?? 50
@@ -12,10 +12,9 @@ export function useNotes(threadId: string, params?: { limit?: number }) {
   return useInfiniteQuery({
     queryKey: ['notes', threadId, params],
     queryFn: async ({ pageParam }) => {
-      const result = await noteRepo.getByThread(threadId, {
-        before: pageParam,
-        limit,
-      })
+      const result = params?.isSystemThread
+        ? await noteRepo.getAllLocked({ before: pageParam, limit })
+        : await noteRepo.getByThread(threadId, { before: pageParam, limit })
       return {
         notes: result.data,
         hasMore: result.hasMore,
@@ -109,6 +108,9 @@ export function useLockNote(threadId: string) {
       noteRepo.setLocked(noteId, isLocked),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notes', threadId] })
+      // Protected Notes aggregates all locked notes — invalidate its cache too
+      queryClient.invalidateQueries({ queryKey: ['notes', 'system-protected-notes'] })
+      queryClient.invalidateQueries({ queryKey: ['threads'] })
       schedulePush()
     },
   })

@@ -1,15 +1,23 @@
-import { useState, useCallback } from 'react'
-import { useFocusEffect } from 'expo-router'
-import { ScrollView, Alert, Image, Switch } from 'react-native'
-import { YStack, XStack, Text, Button, Separator } from 'tamagui'
-import { useRouter } from 'expo-router'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { Directory, Paths } from 'expo-file-system/next'
+import { useFocusEffect, useRouter } from 'expo-router'
+import { Database, SunMoon } from 'lucide-react-native'
+import { useCallback, useState } from 'react'
+import { Alert, Image, ScrollView, Switch } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Button, Separator, Text, XStack, YStack } from 'tamagui'
 import { useThemeColor } from '../../hooks/useThemeColor'
-import { useUser, useUpdateUser, useDeleteAccount } from '../../hooks/useUser'
-import { deleteRemoteData, deleteAccountInfo, logout } from '../../services/api'
+import { useDeleteAccount, useUpdateUser, useUser } from '../../hooks/useUser'
+import { deleteAccountInfo, deleteRemoteData, logout } from '../../services/api'
 import { clearAll } from '../../services/storage'
+
+function getInitials(name: string): string {
+  const words = name.trim().split(/\s+/)
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase()
+  }
+  return name.slice(0, 2).toUpperCase()
+}
 
 interface SettingsItemProps {
   icon: keyof typeof Ionicons.glyphMap
@@ -19,6 +27,7 @@ interface SettingsItemProps {
   onPress: () => void
   showArrow?: boolean
   danger?: boolean
+  customIcon?: React.ReactNode
 }
 
 function SettingsItem({
@@ -29,6 +38,7 @@ function SettingsItem({
   onPress,
   showArrow = true,
   danger = false,
+  customIcon,
 }: SettingsItemProps) {
   const { iconColor: defaultIconColor, errorColor } = useThemeColor()
 
@@ -49,7 +59,7 @@ function SettingsItem({
         alignItems="center"
         justifyContent="center"
       >
-        <Ionicons name={icon} size={20} color={danger ? errorColor : iconColor} />
+        {customIcon || <Ionicons name={icon} size={20} color={danger ? errorColor : iconColor} />}
       </XStack>
 
       <YStack flex={1}>
@@ -172,14 +182,9 @@ export default function SettingsScreen() {
     router.push('/settings/privacy')
   }, [router])
 
-  const handleTheme = useCallback(() => {
-    Alert.alert('Theme', 'Choose a theme', [
-      { text: 'Light', onPress: () => console.log('Light') },
-      { text: 'Dark', onPress: () => console.log('Dark') },
-      { text: 'System (Default)', onPress: () => console.log('System') },
-      { text: 'Cancel', style: 'cancel' },
-    ])
-  }, [])
+  const handleCustomize = useCallback(() => {
+    router.push('/settings/customize')
+  }, [router])
 
   const handleHelp = useCallback(() => {
     console.log('Help')
@@ -375,7 +380,7 @@ export default function SettingsScreen() {
               justifyContent="center"
             >
               <Text color={brandText} fontSize="$6" fontWeight="600">
-                {(user?.name || 'Me').slice(0, 2).toUpperCase()}
+                {getInitials(user?.name || 'Me')}
               </Text>
             </XStack>
           )}
@@ -384,9 +389,16 @@ export default function SettingsScreen() {
             <Text fontSize="$5" fontWeight="600" color="$color">
               {user?.name || 'Me'}
             </Text>
-            <Text fontSize="$3" color="$colorSubtle">
-              {user?.username ? `@${user.username}` : 'Username not set'}
-            </Text>
+            <XStack alignItems="center" gap="$1.5">
+              <Ionicons
+                name={hasIdentity && dataSyncEnabled ? 'cloud-done-outline' : 'cloud-offline-outline'}
+                size={14}
+                color={hasIdentity && dataSyncEnabled ? successColor : warningColor}
+              />
+              <Text fontSize="$3" color="$colorSubtle">
+                {user?.username ? `@${user.username}` : user?.phone || user?.email || 'Online identity not set'}
+              </Text>
+            </XStack>
           </YStack>
 
           <XStack backgroundColor="$backgroundStrong" paddingHorizontal="$2" paddingVertical="$1" borderRadius="$2">
@@ -424,10 +436,11 @@ export default function SettingsScreen() {
         />
         <SettingsItem
           icon="color-palette-outline"
-          iconColor="#8b5cf6"
-          title="Theme"
-          subtitle="System"
-          onPress={handleTheme}
+          iconColor={accentColor}
+          title="Customize"
+          subtitle="Appearance and theme"
+          onPress={handleCustomize}
+          customIcon={<SunMoon size={20} color={accentColor} />}
         />
         <SettingsItem
           icon="help-circle-outline"
@@ -444,8 +457,8 @@ export default function SettingsScreen() {
 
         <SectionHeader title="Data Control" />
         <SettingsToggleItem
-          icon="sync-outline"
-          iconColor={hasIdentity ? accentColor : iconColor}
+          icon={hasIdentity && dataSyncEnabled ? 'cloud-done-outline' : 'cloud-offline-outline'}
+          iconColor={hasIdentity && dataSyncEnabled ? accentColor : iconColor}
           title="Data Sync"
           subtitle={
             !hasIdentity
@@ -472,8 +485,9 @@ export default function SettingsScreen() {
           trackColor={accentColor}
         />
         <SettingsItem
-          icon="cloud-offline-outline"
+          icon="server-outline"
           iconColor={warningColor}
+          customIcon={<Database size={20} color={warningColor} />}
           title="Delete Remote Data"
           subtitle="Remove all threads, tasks, and notes from cloud"
           onPress={handleDeleteRemoteData}
@@ -483,8 +497,7 @@ export default function SettingsScreen() {
           icon="person-remove-outline"
           iconColor={warningColor}
           title="Delete Account Information"
-          subtitle="Remove name, email, phone, username"
-          onPress={handleDeleteAccountInfo}
+subtitle="Remove identity data from cloud and this device"          onPress={handleDeleteAccountInfo}
           showArrow={false}
         />
         <SettingsItem
@@ -496,10 +509,10 @@ export default function SettingsScreen() {
           showArrow={false}
         />
         <SettingsItem
-          icon="nuclear-outline"
+          icon="trash-outline"
           iconColor=""
           title="Delete Everything"
-          subtitle="Reset app to factory state"
+          subtitle="Remove all data from cloud and this device"
           onPress={handleDeleteEverything}
           showArrow={false}
           danger
