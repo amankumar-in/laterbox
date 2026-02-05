@@ -20,7 +20,7 @@ export function useShortcuts() {
           title: thread.name,
           longLabel: thread.lastNote?.content?.slice(0, 25) || thread.name,
           subTitle: thread.lastNote?.content?.slice(0, 50) || 'Open thread',
-          iconName: 'shortcut_icon',
+          iconName: 'splashscreen_logo',
           symbolName: 'note.text',
         })
       } else {
@@ -30,7 +30,7 @@ export function useShortcuts() {
           title: thread.name,
           longLabel: thread.lastNote?.content?.slice(0, 25) || thread.name,
           subTitle: thread.lastNote?.content?.slice(0, 50) || 'Open thread',
-          iconName: 'shortcut_icon',
+          iconName: 'splashscreen_logo',
           symbolName: 'note.text',
         })
       }

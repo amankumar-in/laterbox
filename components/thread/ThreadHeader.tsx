@@ -21,7 +21,7 @@ interface ThreadHeaderProps {
   onThreadPress: () => void
   onSearch: () => void
   onTasks: () => void
-  onMenu: () => void
+  onMenuSelect: (id: string) => void
   taskCount?: number
   isEditingName?: boolean
   onNameChange?: (name: string) => void
@@ -49,7 +49,7 @@ export function ThreadHeader({
   onThreadPress,
   onSearch,
   onTasks,
-  onMenu,
+  onMenuSelect,
   taskCount = 0,
   isEditingName = false,
   onNameChange,
@@ -87,8 +87,7 @@ export function ThreadHeader({
 
   const handleMenuSelect = (id: string) => {
     setMenuOpen(false)
-    console.log('Menu selected:', id, thread.id)
-    onMenu()
+    onMenuSelect(id)
   }
 
   if (isSearching) {
@@ -185,29 +184,30 @@ export function ThreadHeader({
         onPress={isEditingName ? undefined : onThreadPress}
         pressStyle={isEditingName ? undefined : { opacity: 0.7 }}
       >
-        {thread.icon ? (
-          thread.icon.startsWith('file://') || thread.icon.startsWith('content://') ? (
-            <Image
-              source={{ uri: thread.icon }}
-              style={{ width: 36, height: 36, borderRadius: 18 }}
-            />
+        <XStack
+          width={36}
+          height={36}
+          borderRadius={18}
+          backgroundColor="$brandBackground"
+          alignItems="center"
+          justifyContent="center"
+          overflow="hidden"
+        >
+          {thread.icon ? (
+            thread.icon.startsWith('file://') || thread.icon.startsWith('content://') ? (
+              <Image
+                source={{ uri: thread.icon }}
+                style={{ width: 36, height: 36, borderRadius: 18 }}
+              />
+            ) : (
+              <Text fontSize="$5">{thread.icon}</Text>
+            )
           ) : (
-            <Text fontSize="$5">{thread.icon}</Text>
-          )
-        ) : (
-          <XStack
-            width={36}
-            height={36}
-            borderRadius={18}
-            backgroundColor="$brandBackground"
-            alignItems="center"
-            justifyContent="center"
-          >
             <Text color={brandText} fontWeight="600" fontSize="$3">
               {getInitials(thread.name)}
             </Text>
-          </XStack>
-        )}
+          )}
+        </XStack>
         {isEditingName ? (
           <TextInput
             ref={inputRef}

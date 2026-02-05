@@ -6,6 +6,7 @@ import { useThemeColor } from '../../hooks/useThemeColor'
 interface SelectionActionBarProps {
   selectedCount: number
   onClose: () => void
+  onCopy: () => void
   onLock: () => void
   onDelete: () => void
   onTask: () => void
@@ -31,6 +32,7 @@ function Separator() {
 export function SelectionActionBar({
   selectedCount,
   onClose,
+  onCopy,
   onLock,
   onDelete,
   onTask,
@@ -46,14 +48,14 @@ export function SelectionActionBar({
   return (
     <XStack
       backgroundColor="$backgroundStrong"
-      paddingHorizontal="$4"
+      paddingHorizontal="$3"
       paddingVertical="$3"
       alignItems="center"
-      justifyContent="space-between"
       borderTopWidth={1}
       borderTopColor="$borderColor"
     >
-      <XStack alignItems="center" gap="$3">
+      {/* Close + Count */}
+      <XStack alignItems="center" gap="$1">
         <Button
           size="$3"
           circular
@@ -66,7 +68,16 @@ export function SelectionActionBar({
         </Text>
       </XStack>
 
-      <XStack alignItems="center" gap="$3">
+      {/* Actions — fill remaining space, spread evenly */}
+      <XStack flex={1} alignItems="center" justifyContent="flex-end" gap="$2">
+        <Button
+          size="$3"
+          circular
+          chromeless
+          onPress={onCopy}
+          icon={<Ionicons name="copy-outline" size={20} color="#6366F1" />}
+        />
+        <Separator />
         <Button
           size="$3"
           circular

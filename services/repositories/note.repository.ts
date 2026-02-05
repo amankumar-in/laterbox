@@ -431,6 +431,45 @@ export class NoteRepository {
   }
 
   /**
+   * Get media notes for a thread filtered by type
+   */
+  async getMediaByThread(
+    threadId: string,
+    types: NoteType[],
+    page?: number,
+    limit?: number
+  ): Promise<PaginatedResult<NoteWithDetails>> {
+    const pageNum = page ?? 1
+    const lim = limit ?? 50
+    const offset = (pageNum - 1) * lim
+
+    const placeholders = types.map(() => '?').join(', ')
+    const whereClause = `WHERE n.thread_id = ? AND n.type IN (${placeholders}) AND n.deleted_at IS NULL`
+    const queryParams: (string | number)[] = [threadId, ...types]
+
+    const countResult = await this.db.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) as count FROM notes n ${whereClause}`,
+      queryParams
+    )
+    const total = countResult?.count ?? 0
+
+    const rows = await this.db.getAllAsync<NoteRow>(
+      `SELECT n.*, t.name as thread_name
+       FROM notes n
+       LEFT JOIN threads t ON n.thread_id = t.id
+       ${whereClause}
+       ORDER BY n.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...queryParams, lim, offset]
+    )
+
+    const notes = rows.map((row) => this.mapToNote(row))
+    const hasMore = offset + rows.length < total
+
+    return { data: notes, hasMore, total }
+  }
+
+  /**
    * Full-text search across notes
    */
   async search(params: {

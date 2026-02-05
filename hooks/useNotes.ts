@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from '@tanstack/react-query'
 import { useDb } from '@/contexts/DatabaseContext'
 import { getNoteRepository, getThreadRepository, getUserRepository } from '@/services/repositories'
 import { useSyncService } from './useSyncService'
@@ -32,6 +32,17 @@ export function useNotes(threadId: string, params?: { limit?: number; isSystemTh
       return oldestNote?.createdAt
     },
     initialPageParam: undefined as string | undefined,
+    enabled: !!threadId,
+  })
+}
+
+export function useThreadMedia(threadId: string, types: NoteType[], limit?: number) {
+  const db = useDb()
+  const noteRepo = getNoteRepository(db)
+
+  return useQuery({
+    queryKey: ['thread-media', threadId, types],
+    queryFn: () => noteRepo.getMediaByThread(threadId, types, 1, limit),
     enabled: !!threadId,
   })
 }

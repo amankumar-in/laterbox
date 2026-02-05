@@ -1,7 +1,7 @@
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Keyboard, Platform } from 'react-native'
+import { ActivityIndicator, Alert, BackHandler, Keyboard, Platform } from 'react-native'
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Text, YStack } from 'tamagui'
@@ -16,7 +16,11 @@ import { useAudioPlayer } from '../../../hooks/useAudioPlayer'
 import { useVoiceRecorder } from '../../../hooks/useVoiceRecorder'
 import { useCompleteTask, useDeleteNote, useLockNote, useNotes, useSendNote, useSetNoteTask, useStarNote, useUpdateNote } from '../../../hooks/useNotes'
 import { useThread, useUpdateThread } from '../../../hooks/useThreads'
+import { useExportThread } from '../../../hooks/useExportThread'
+import { useShortcuts } from '../../../hooks/useShortcuts'
 import { useAttachmentHandler, type AttachmentResult } from '../../../hooks/useAttachmentHandler'
+import * as Clipboard from 'expo-clipboard'
+import * as Haptics from 'expo-haptics'
 import { setContactPickerCallback } from '../../../services/contactPickerStore'
 import type { NoteType, NoteWithDetails, ThreadWithLastNote } from '../../../types'
 
@@ -71,6 +75,8 @@ export default function ThreadScreen() {
   const starNoteMutation = useStarNote(threadId)
   const setNoteTaskMutation = useSetNoteTask(threadId)
   const completeTaskMutation = useCompleteTask(threadId)
+  const { exportThread, isExporting } = useExportThread()
+  const { addShortcut } = useShortcuts()
 
   const notes = notesData?.pages.flatMap(page => page.notes) ?? []
   const isLoading = notesLoading
@@ -159,9 +165,31 @@ export default function ThreadScreen() {
     router.push(`/tasks?threadId=${id}&threadName=${threadName}`)
   }, [router, id, thread?.name])
 
-  const handleMenu = useCallback(() => {
-    console.log('Menu:', id)
-  }, [id])
+  const handleMenuSelect = useCallback((menuId: string) => {
+    switch (menuId) {
+      case 'media':
+        router.push(`/thread/${id}/media`)
+        break
+      case 'shortcut':
+        if (thread) {
+          addShortcut(thread).then((success) => {
+            if (success) {
+              Alert.alert('Shortcut Added', `${thread.name} added to shortcuts.`)
+            } else {
+              Alert.alert('Failed', 'Could not add shortcut.')
+            }
+          })
+        }
+        break
+      case 'export':
+        if (thread) {
+          exportThread(thread.id, thread.name).catch(() => {
+            Alert.alert('Export Failed', 'Could not export the thread.')
+          })
+        }
+        break
+    }
+  }, [router, id, thread, addShortcut, exportThread])
 
   const handleImageView = useCallback((uri: string) => {
     setViewingImageUri(uri)
@@ -248,7 +276,17 @@ export default function ThreadScreen() {
 
   const isSelectionMode = selectedNoteIds.size > 0
 
+  useEffect(() => {
+    if (!isSelectionMode) return
+    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
+      setSelectedNoteIds(new Set())
+      return true
+    })
+    return () => handler.remove()
+  }, [isSelectionMode])
+
   const handleNoteLongPress = useCallback((note: NoteWithDetails) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
     setSelectedNoteIds(new Set([note.id]))
   }, [])
 
@@ -273,6 +311,38 @@ export default function ThreadScreen() {
   const selectedNotes = useMemo(() => {
     return notes.filter(n => selectedNoteIds.has(n.id))
   }, [notes, selectedNoteIds])
+
+  const handleSelectionCopy = useCallback(async () => {
+    if (selectedNotes.length === 0) return
+
+    // Sort by creation time (oldest first) for readable order
+    const sorted = [...selectedNotes].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    )
+
+    let text: string
+    if (sorted.length === 1) {
+      text = sorted[0].content || ''
+    } else {
+      text = sorted.map((note) => {
+        const date = new Date(note.createdAt)
+        const formatted = date.toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        })
+        const time = date.toLocaleTimeString('en-GB', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+        const content = note.content || `[${note.type}]`
+        return `[${formatted}, ${time}] ${content}`
+      }).join('\n')
+    }
+
+    await Clipboard.setStringAsync(text)
+    handleClearSelection()
+  }, [selectedNotes, handleClearSelection])
 
   const handleSelectionLock = useCallback(() => {
     const shouldLock = !selectedNotes.every(n => n.isLocked)
@@ -503,7 +573,7 @@ export default function ThreadScreen() {
         onThreadPress={handleThreadPress}
         onSearch={handleSearch}
         onTasks={handleTasks}
-        onMenu={handleMenu}
+        onMenuSelect={handleMenuSelect}
         taskCount={taskCount}
         isEditingName={isEditingName}
         onNameChange={handleNameChange}
@@ -543,6 +613,7 @@ export default function ThreadScreen() {
           <SelectionActionBar
             selectedCount={selectedNoteIds.size}
             onClose={handleClearSelection}
+            onCopy={handleSelectionCopy}
             onLock={handleSelectionLock}
             onDelete={handleSelectionDelete}
             onTask={handleSelectionTask}

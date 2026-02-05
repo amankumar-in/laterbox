@@ -1,10 +1,11 @@
-import { useState, useCallback, useMemo } from 'react'
-import { FlatList, Alert, ActivityIndicator, RefreshControl } from 'react-native'
+import { useState, useCallback, useMemo, useEffect } from 'react'
+import { FlatList, Alert, ActivityIndicator, RefreshControl, BackHandler } from 'react-native'
 import { YStack, XStack, Text, Separator, Button } from 'tamagui'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { ScanLine } from 'lucide-react-native'
+import * as Haptics from 'expo-haptics'
 
 import { Header } from '../components/Header'
 import { SearchBar } from '../components/SearchBar'
@@ -39,6 +40,15 @@ export default function HomeScreen() {
   const [selectedThreadIds, setSelectedThreadIds] = useState<Set<string>>(new Set())
 
   const isSelectionMode = selectedThreadIds.size > 0
+
+  useEffect(() => {
+    if (!isSelectionMode) return
+    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
+      setSelectedThreadIds(new Set())
+      return true
+    })
+    return () => handler.remove()
+  }, [isSelectionMode])
 
   // API hooks
   const {
@@ -117,6 +127,7 @@ export default function HomeScreen() {
   const handleThreadLongPress = useCallback(
     (thread: ThreadWithLastNote) => {
       if (!isSelectionMode) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
         setSelectedThreadIds(new Set([thread.id]))
       }
     },

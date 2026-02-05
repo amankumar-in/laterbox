@@ -1,15 +1,19 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { ScrollView, Alert, Image, TextInput } from 'react-native'
+import { ScrollView, Alert, Image, TextInput, Pressable } from 'react-native'
 import { YStack, XStack, Text, Button } from 'tamagui'
+import { Image as ExpoImage } from 'expo-image'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 
 import { useThread, useUpdateThread } from '../../../hooks/useThreads'
+import { useThreadMedia } from '../../../hooks/useNotes'
 import { useExportThread } from '../../../hooks/useExportThread'
 import { useShortcuts } from '../../../hooks/useShortcuts'
 import { useThemeColor } from '../../../hooks/useThemeColor'
+import { resolveAttachmentUri } from '../../../services/fileStorage'
+import type { NoteType, NoteWithDetails } from '../../../services/database/types'
 
 function getInitials(name: string): string {
   const words = name.trim().split(/\s+/)
@@ -20,14 +24,17 @@ function getInitials(name: string): string {
 }
 
 const EMOJI_OPTIONS = ['💡', '📝', '🎯', '💼', '🏠', '❤️', '🎨', '🎵', '📚', '✈️', '🍕']
+const MEDIA_TYPES: NoteType[] = ['image', 'video', 'file']
+const THUMB_SIZE = 70
 
 export default function ThreadInfoScreen() {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id: string }>()
   const insets = useSafeAreaInsets()
-  const { iconColorStrong, iconColor, brandText, color } = useThemeColor()
+  const { iconColorStrong, iconColor, brandText, color, accentColor, warningColor, infoColor } = useThemeColor()
 
   const { data: thread, isLoading } = useThread(id || '')
+  const { data: mediaResult } = useThreadMedia(id || '', MEDIA_TYPES, 10)
   const updateThread = useUpdateThread()
   const { exportThread, isExporting } = useExportThread()
   const { addShortcut } = useShortcuts()
@@ -81,7 +88,6 @@ export default function ThreadInfoScreen() {
     })
 
     if (!result.canceled && result.assets[0]) {
-      // For now, store the URI - in production this would upload to server
       updateThread.mutate({ id: id || '', data: { icon: result.assets[0].uri } })
       setShowEmojiPicker(false)
     }
@@ -111,8 +117,9 @@ export default function ThreadInfoScreen() {
   }, [router, id])
 
   const handleTasks = useCallback(() => {
-    router.push('/tasks')
-  }, [router])
+    if (!thread) return
+    router.push(`/tasks?threadId=${id}&threadName=${encodeURIComponent(thread.name)}`)
+  }, [router, id, thread])
 
   if (isLoading || !thread) {
     return (
@@ -121,6 +128,8 @@ export default function ThreadInfoScreen() {
       </YStack>
     )
   }
+
+  const mediaItems = mediaResult?.data ?? []
 
   return (
     <YStack flex={1} backgroundColor="$background">
@@ -146,63 +155,77 @@ export default function ThreadInfoScreen() {
       </XStack>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
+        <Pressable onPress={() => showEmojiPicker && setShowEmojiPicker(false)}>
         {/* Thread Icon & Name */}
         <YStack alignItems="center" padding="$6" gap="$4">
-          <Button
-            size="$8"
-            circular
-            backgroundColor="$brandBackground"
-            onPress={() => setShowEmojiPicker(!showEmojiPicker)}
-            overflow="hidden"
-          >
-            {thread.icon ? (
-              thread.icon.startsWith('file://') || thread.icon.startsWith('content://') ? (
-                <Image
-                  source={{ uri: thread.icon }}
-                  style={{ width: 80, height: 80, borderRadius: 40 }}
-                />
+          <Pressable onPress={() => setShowEmojiPicker(!showEmojiPicker)}>
+            <YStack width={80} height={80} borderRadius={40} backgroundColor="$brandBackground" alignItems="center" justifyContent="center" overflow="hidden">
+              {thread.icon ? (
+                thread.icon.startsWith('file://') || thread.icon.startsWith('content://') ? (
+                  <Image
+                    source={{ uri: thread.icon }}
+                    style={{ width: 80, height: 80, borderRadius: 40 }}
+                  />
+                ) : (
+                  <Text fontSize={40}>{thread.icon}</Text>
+                )
               ) : (
-                <Text fontSize={40}>{thread.icon}</Text>
-              )
-            ) : (
-              <Text color={brandText} fontSize={28} fontWeight="700">
-                {getInitials(thread.name)}
-              </Text>
-            )}
-          </Button>
-
-          {showEmojiPicker && (
-            <YStack backgroundColor="$backgroundStrong" borderRadius="$4" padding="$3">
-              <XStack flexWrap="wrap" justifyContent="center" gap="$2">
-                <Button
-                  size="$4"
-                  chromeless
-                  onPress={handleSelectImage}
-                >
-                  <Ionicons name="image-outline" size={24} color={iconColor} />
-                </Button>
-                {EMOJI_OPTIONS.map((emoji) => (
-                  <Button
-                    key={emoji}
-                    size="$4"
-                    chromeless
-                    onPress={() => handleSelectEmoji(emoji)}
-                  >
-                    <Text fontSize={24}>{emoji}</Text>
-                  </Button>
-                ))}
-              </XStack>
-              {thread.icon && (
-                <Button
-                  size="$3"
-                  chromeless
-                  marginTop="$2"
-                  onPress={handleRemoveEmoji}
-                >
-                  <Text color="$colorSubtle" fontSize="$2">Remove icon</Text>
-                </Button>
+                <Text color={brandText} fontSize={28} fontWeight="700">
+                  {getInitials(thread.name)}
+                </Text>
               )}
             </YStack>
+            <YStack
+              position="absolute"
+              bottom={0}
+              right={0}
+              width={26}
+              height={26}
+              borderRadius={13}
+              backgroundColor="$accentColor"
+              alignItems="center"
+              justifyContent="center"
+              borderWidth={2}
+              borderColor="$background"
+            >
+              <Ionicons name="pencil" size={13} color="white" />
+            </YStack>
+          </Pressable>
+
+          {showEmojiPicker && (
+            <Pressable onPress={(e) => e.stopPropagation()}>
+              <YStack backgroundColor="$backgroundStrong" borderRadius="$4" padding="$3">
+                <XStack flexWrap="wrap" justifyContent="center" gap="$2">
+                  <Button
+                    size="$4"
+                    chromeless
+                    onPress={handleSelectImage}
+                  >
+                    <Ionicons name="image-outline" size={24} color={iconColor} />
+                  </Button>
+                  {EMOJI_OPTIONS.map((emoji) => (
+                    <Button
+                      key={emoji}
+                      size="$4"
+                      chromeless
+                      onPress={() => handleSelectEmoji(emoji)}
+                    >
+                      <Text fontSize={24}>{emoji}</Text>
+                    </Button>
+                  ))}
+                </XStack>
+                {thread.icon && (
+                  <Button
+                    size="$3"
+                    chromeless
+                    marginTop="$2"
+                    onPress={handleRemoveEmoji}
+                  >
+                    <Text color="$colorSubtle" fontSize="$2">Remove avatar</Text>
+                  </Button>
+                )}
+              </YStack>
+            </Pressable>
           )}
 
           {isEditingName ? (
@@ -241,41 +264,115 @@ export default function ThreadInfoScreen() {
               </Text>
             </YStack>
           )}
-
-          <Text color="$colorSubtle" fontSize="$3">
-            Created {new Date(thread.createdAt).toLocaleDateString()}
-          </Text>
         </YStack>
 
+        {/* Media Preview Row */}
+        {mediaItems.length > 0 && (
+          <YStack paddingHorizontal="$4" marginBottom="$4">
+            <XStack justifyContent="space-between" alignItems="center" marginBottom="$2">
+              <Text fontSize="$3" fontWeight="600" color="$color">Media & Files</Text>
+              <Pressable onPress={handleMediaFiles}>
+                <Text fontSize="$2" color="$accentColor">See All</Text>
+              </Pressable>
+            </XStack>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <XStack gap="$2">
+                {mediaItems.map((note) => (
+                  <MediaThumb key={note.id} note={note} iconColor={iconColor} />
+                ))}
+              </XStack>
+            </ScrollView>
+          </YStack>
+        )}
+
         {/* Actions */}
-        <YStack paddingHorizontal="$4" gap="$2">
-          <MenuItem
-            icon="images-outline"
-            label="Media, Links & Docs"
-            onPress={handleMediaFiles}
-            iconColor={iconColor}
-          />
+        <YStack>
           <MenuItem
             icon="checkbox-outline"
             label="Tasks"
             onPress={handleTasks}
-            iconColor={iconColor}
+            iconColor={warningColor}
           />
           <MenuItem
             icon="add-circle-outline"
             label="Add Shortcut"
             onPress={handleAddShortcut}
-            iconColor={iconColor}
+            iconColor={accentColor}
           />
           <MenuItem
             icon="download-outline"
             label="Export Thread"
             onPress={handleExport}
             loading={isExporting}
-            iconColor={iconColor}
+            iconColor={infoColor}
           />
         </YStack>
+
+        {/* Created Info */}
+        <YStack alignItems="center" paddingTop="$6" paddingBottom="$2">
+          <Text color="$colorSubtle" fontSize="$3">
+            Created {new Date(thread.createdAt).toLocaleDateString()}
+          </Text>
+        </YStack>
+        </Pressable>
       </ScrollView>
+    </YStack>
+  )
+}
+
+function MediaThumb({ note, iconColor }: { note: NoteWithDetails; iconColor: string }) {
+  const isVisual = note.type === 'image' || note.type === 'video'
+  const thumbUri = note.type === 'video' && note.attachment?.thumbnail
+    ? resolveAttachmentUri(note.attachment.thumbnail)
+    : note.attachment?.url
+      ? resolveAttachmentUri(note.attachment.url)
+      : null
+
+  if (isVisual && thumbUri) {
+    return (
+      <YStack
+        width={THUMB_SIZE}
+        height={THUMB_SIZE}
+        borderRadius="$2"
+        overflow="hidden"
+        backgroundColor="$backgroundStrong"
+      >
+        <ExpoImage
+          source={{ uri: thumbUri }}
+          style={{ width: THUMB_SIZE, height: THUMB_SIZE }}
+          contentFit="cover"
+        />
+        {note.type === 'video' && (
+          <YStack
+            position="absolute"
+            top={0}
+            left={0}
+            right={0}
+            bottom={0}
+            justifyContent="center"
+            alignItems="center"
+          >
+            <Ionicons name="play-circle" size={24} color="rgba(255,255,255,0.85)" />
+          </YStack>
+        )}
+      </YStack>
+    )
+  }
+
+  // File/document placeholder
+  return (
+    <YStack
+      width={THUMB_SIZE}
+      height={THUMB_SIZE}
+      borderRadius="$2"
+      backgroundColor="$backgroundStrong"
+      justifyContent="center"
+      alignItems="center"
+    >
+      <Ionicons name="document-outline" size={28} color={iconColor} />
+      <Text fontSize={9} color="$colorSubtle" numberOfLines={1} paddingHorizontal="$1">
+        {note.attachment?.filename || 'File'}
+      </Text>
     </YStack>
   )
 }
@@ -295,18 +392,25 @@ function MenuItem({
 }) {
   return (
     <XStack
+      paddingHorizontal="$4"
       paddingVertical="$3"
-      paddingHorizontal="$3"
       gap="$3"
       alignItems="center"
-      backgroundColor="$backgroundStrong"
-      borderRadius="$3"
-      pressStyle={{ opacity: 0.7 }}
+      pressStyle={{ backgroundColor: '$backgroundHover' }}
       onPress={onPress}
       opacity={loading ? 0.5 : 1}
       disabled={loading}
     >
-      <Ionicons name={icon} size={22} color={iconColor} />
+      <XStack
+        width={36}
+        height={36}
+        borderRadius="$2"
+        backgroundColor="$backgroundStrong"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Ionicons name={icon} size={20} color={iconColor} />
+      </XStack>
       <Text fontSize="$4" color="$color" flex={1}>
         {label}
       </Text>
