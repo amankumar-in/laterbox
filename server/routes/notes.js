@@ -71,7 +71,7 @@ router.post('/:threadId/notes', authenticate, validateThreadAccess, asyncHandler
     });
   }
 
-  if (['image', 'voice', 'file'].includes(type) && !attachment?.url) {
+  if (['image', 'video', 'voice', 'file', 'audio'].includes(type) && !attachment?.url) {
     return res.status(400).json({
       error: 'Attachment required',
       message: `${type} notes must have an attachment URL`,
@@ -82,6 +82,13 @@ router.post('/:threadId/notes', authenticate, validateThreadAccess, asyncHandler
     return res.status(400).json({
       error: 'Location required',
       message: 'Location notes must have latitude and longitude',
+    });
+  }
+
+  if (type === 'contact' && !content?.trim()) {
+    return res.status(400).json({
+      error: 'Contact data required',
+      message: 'Contact notes must have content',
     });
   }
 

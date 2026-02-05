@@ -1,12 +1,12 @@
+import bcrypt from 'bcrypt';
 import express from 'express';
+import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import multer from 'multer';
-import bcrypt from 'bcrypt';
-import User from '../models/User.js';
-import Verification from '../models/Verification.js';
 import { authenticate, generateToken } from '../middleware/auth.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
+import User from '../models/User.js';
+import Verification from '../models/Verification.js';
 import { sendEmailVerification, sendSmsVerification } from '../services/verification.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

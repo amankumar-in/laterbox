@@ -1,18 +1,18 @@
-import { Platform } from 'react-native'
 import axios, { AxiosInstance } from 'axios'
 import type { SQLiteDatabase } from 'expo-sqlite'
-import { getAuthToken } from '../storage'
+import { Platform } from 'react-native'
+import type {
+  NoteRow,
+  NoteType,
+  ThreadRow,
+  UserRow,
+} from '../database/types'
 import {
-  getThreadRepository,
   getNoteRepository,
+  getThreadRepository,
   getUserRepository,
 } from '../repositories'
-import type {
-  ThreadRow,
-  NoteRow,
-  UserRow,
-  NoteType,
-} from '../database/types'
+import { getAuthToken, getSyncEnabled } from '../storage'
 
 // Server response types
 interface ServerThread {
@@ -98,8 +98,8 @@ interface SyncChangesResponse {
 
 interface SyncPushResponse {
   user?: { localId: string; serverId: string }
-  threads: Array<{ localId: string; serverId: string }>
-  notes: Array<{ localId: string; serverId: string }>
+  threads: { localId: string; serverId: string }[]
+  notes: { localId: string; serverId: string }[]
 }
 
 const getDefaultUrl = () => {
@@ -199,6 +199,10 @@ export class SyncService {
    * Pull changes from server
    */
   async pull(): Promise<void> {
+    if (!(await getSyncEnabled())) {
+      console.log('[Sync] Pull skipped - sync disabled in settings')
+      return
+    }
     // No API access if not authenticated
     const api = await this.getApi()
     if (!api) {
@@ -286,6 +290,10 @@ export class SyncService {
    * Push local changes to server
    */
   async push(): Promise<void> {
+    if (!(await getSyncEnabled())) {
+      console.log('[Sync] Push skipped - sync disabled in settings')
+      return
+    }
     // No API access if not authenticated
     const api = await this.getApi()
     if (!api) {
@@ -464,12 +472,12 @@ export class SyncService {
       type: note.type,
       attachment: note.attachment_url
         ? {
-            url: note.attachment_url,
+            url: note.attachment_filename || 'attachment', // Send filename, not local file path
             filename: note.attachment_filename,
             mimeType: note.attachment_mime_type,
             size: note.attachment_size,
             duration: note.attachment_duration,
-            thumbnail: note.attachment_thumbnail,
+            thumbnail: note.attachment_thumbnail ? (note.attachment_filename || 'thumbnail') : undefined,
             width: note.attachment_width,
             height: note.attachment_height,
           }

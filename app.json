@@ -64,7 +64,20 @@
       ],
       "expo-font",
       "@react-native-community/datetimepicker",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Mneme to access your location for sharing."
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow Mneme to access your contacts for sharing."
+        }
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

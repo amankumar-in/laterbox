@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { AppState, type AppStateStatus } from 'react-native'
 import { useQueryClient } from '@tanstack/react-query'
 import { useDb } from '@/contexts/DatabaseContext'
+import { getSyncEnabled } from '@/services/storage'
 import { getSyncService, type SyncService } from '@/services/sync/sync.service'
 
 interface SyncServiceHook {
@@ -57,49 +58,54 @@ export function useSyncService(): SyncServiceHook {
 }
 
 /**
- * Hook to auto-sync when app comes to foreground
- * NOTE: Sync is blocked by the sync service if user has no identity set
+ * Hook to auto-sync when app comes to foreground.
+ * Respects the persisted "Data Sync" setting; if sync is disabled in settings, no sync runs.
  */
 export function useAutoSync() {
   const { push, pull } = useSyncService()
   const appStateRef = useRef<AppStateStatus>(AppState.currentState)
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      // App came to foreground: push pending changes first, then pull
-      if (
-        appStateRef.current.match(/inactive|background/) &&
-        nextAppState === 'active'
-      ) {
-        push()
-          .catch((error) => {
-            if (error?.message === 'AUTH_CLEARED') return
-            console.log('[AutoSync] Push failed (offline?):', error.message)
-          })
-          .then(() => pull())
-          .catch((error) => {
-            if (error?.message === 'AUTH_CLEARED') return
-            console.log('[AutoSync] Pull failed (offline?):', error.message)
-          })
-      }
+    let cancelled = false
+    let subscription: { remove: () => void } | null = null
 
-      appStateRef.current = nextAppState
+    getSyncEnabled().then((enabled) => {
+      if (cancelled || !enabled) return
+
+      subscription = AppState.addEventListener('change', (nextAppState) => {
+        if (
+          appStateRef.current.match(/inactive|background/) &&
+          nextAppState === 'active'
+        ) {
+          push()
+            .catch((error) => {
+              if (error?.message === 'AUTH_CLEARED') return
+              console.log('[AutoSync] Push failed (offline?):', error.message)
+            })
+            .then(() => pull())
+            .catch((error) => {
+              if (error?.message === 'AUTH_CLEARED') return
+              console.log('[AutoSync] Pull failed (offline?):', error.message)
+            })
+        }
+        appStateRef.current = nextAppState
+      })
+
+      push()
+        .catch((error) => {
+          if (error?.message === 'AUTH_CLEARED') return
+          console.log('[AutoSync] Initial push failed (offline?):', error.message)
+        })
+        .then(() => pull())
+        .catch((error) => {
+          if (error?.message === 'AUTH_CLEARED') return
+          console.log('[AutoSync] Initial pull failed (offline?):', error.message)
+        })
     })
 
-    // Initial sync on mount: push pending changes first, then pull
-    push()
-      .catch((error) => {
-        if (error?.message === 'AUTH_CLEARED') return
-        console.log('[AutoSync] Initial push failed (offline?):', error.message)
-      })
-      .then(() => pull())
-      .catch((error) => {
-        if (error?.message === 'AUTH_CLEARED') return
-        console.log('[AutoSync] Initial pull failed (offline?):', error.message)
-      })
-
     return () => {
-      subscription.remove()
+      cancelled = true
+      subscription?.remove()
     }
   }, [push, pull])
 }

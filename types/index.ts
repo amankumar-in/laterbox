@@ -1,4 +1,4 @@
-export type NoteType = 'text' | 'image' | 'voice' | 'file' | 'location'
+export type NoteType = 'text' | 'image' | 'video' | 'voice' | 'file' | 'location' | 'contact' | 'audio'
 
 // Re-export local database types for components that need them
 export type {

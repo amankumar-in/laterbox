@@ -2,8 +2,11 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { XStack, YStack, Button, Text } from 'tamagui'
 import { Ionicons } from '@expo/vector-icons'
 import { Keyboard, TextInput } from 'react-native'
+import { Image } from 'expo-image'
 import { useThemeColor } from '../../hooks/useThemeColor'
+import { resolveAttachmentUri } from '../../services/fileStorage'
 import type { NoteWithDetails, NoteType } from '../../types'
+import type { AttachmentResult } from '../../hooks/useAttachmentHandler'
 
 const attachmentOptions = [
   { id: 'image', icon: 'image-outline', label: 'Image', color: '$purple5' },
@@ -23,6 +26,8 @@ interface NoteInputProps {
   onCancelEdit?: () => void
   showAttachments: boolean
   onToggleAttachments: () => void
+  pendingAttachment?: AttachmentResult | null
+  onClearAttachment?: () => void
 }
 
 export function NoteInput({
@@ -34,6 +39,8 @@ export function NoteInput({
   onCancelEdit,
   showAttachments,
   onToggleAttachments,
+  pendingAttachment,
+  onClearAttachment,
 }: NoteInputProps) {
   const { iconColor, brandText, placeholderColor, color } = useThemeColor()
   const [text, setText] = useState('')
@@ -57,11 +64,17 @@ export function NoteInput({
 
   const handleSend = useCallback(() => {
     const trimmedText = text.trim()
+    if (pendingAttachment) {
+      onSend({ content: trimmedText || undefined, type: pendingAttachment.type })
+      setText('')
+      onClearAttachment?.()
+      return
+    }
     if (trimmedText) {
       onSend({ content: trimmedText, type: 'text' })
       setText('')
     }
-  }, [text, onSend])
+  }, [text, onSend, pendingAttachment, onClearAttachment])
 
   const handleVoicePress = useCallback(() => {
     if (!isRecording) {
@@ -83,6 +96,7 @@ export function NoteInput({
   }, [onToggleAttachments, onAttachmentSelect])
 
   const hasText = text.trim().length > 0
+  const canSend = hasText || !!pendingAttachment
 
   const attachmentPanel = showAttachments && (
     <XStack
@@ -118,6 +132,28 @@ export function NoteInput({
     </XStack>
   )
 
+  const getAttachmentLabel = () => {
+    if (!pendingAttachment) return ''
+    switch (pendingAttachment.type) {
+      case 'image': return pendingAttachment.filename || 'Photo'
+      case 'video': return pendingAttachment.filename || 'Video'
+      case 'file': return pendingAttachment.filename || 'Document'
+      case 'audio': return pendingAttachment.filename || 'Audio'
+      default: return 'Attachment'
+    }
+  }
+
+  const getAttachmentIcon = (): string => {
+    if (!pendingAttachment) return 'attach'
+    switch (pendingAttachment.type) {
+      case 'image': return 'image'
+      case 'video': return 'videocam'
+      case 'file': return 'document'
+      case 'audio': return 'musical-notes'
+      default: return 'attach'
+    }
+  }
+
   return (
     <YStack
       borderTopWidth={1}
@@ -125,6 +161,42 @@ export function NoteInput({
       backgroundColor="$background"
     >
       {attachmentPanel}
+
+      {pendingAttachment && (
+        <XStack
+          backgroundColor="$backgroundStrong"
+          paddingLeft="$3"
+          paddingRight="$2"
+          paddingVertical="$2"
+          alignItems="center"
+          gap="$2"
+        >
+          {(pendingAttachment.type === 'image' || pendingAttachment.type === 'video') && pendingAttachment.localUri ? (
+            <Image
+              source={{ uri: resolveAttachmentUri(pendingAttachment.thumbnail || pendingAttachment.localUri!) }}
+              style={{ width: 40, height: 40, borderRadius: 6 }}
+              contentFit="cover"
+            />
+          ) : (
+            <XStack
+              width={40}
+              height={40}
+              borderRadius={6}
+              backgroundColor="$brandBackground"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <Ionicons name={getAttachmentIcon() as any} size={20} color={brandText} />
+            </XStack>
+          )}
+          <Text fontSize="$3" color="$color" numberOfLines={1} flex={1}>
+            {getAttachmentLabel()}
+          </Text>
+          <Button size="$3" circular chromeless onPress={onClearAttachment}>
+            <Ionicons name="close" size={20} color={iconColor} />
+          </Button>
+        </XStack>
+      )}
 
       {editingNote && (
         <XStack
@@ -173,7 +245,7 @@ export function NoteInput({
           <TextInput
             ref={inputRef}
             style={{ flex: 1, fontSize: 16, color, paddingHorizontal: 12 }}
-            placeholder="Type a note..."
+            placeholder={pendingAttachment ? 'Add a caption...' : 'Type a note...'}
             placeholderTextColor={placeholderColor}
             value={text}
             onChangeText={setText}
@@ -183,7 +255,7 @@ export function NoteInput({
           />
         </XStack>
 
-        {hasText ? (
+        {canSend ? (
           <Button
             size="$4"
             circular

@@ -18,7 +18,7 @@ const noteSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['text', 'image', 'voice', 'file', 'location'],
+    enum: ['text', 'image', 'video', 'voice', 'file', 'location', 'contact', 'audio'],
     default: 'text',
   },
   attachment: {

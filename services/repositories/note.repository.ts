@@ -1,19 +1,19 @@
 import type { SQLiteDatabase } from 'expo-sqlite'
 import {
+  fromBoolean,
   generateUUID,
   getTimestamp,
   toBoolean,
-  fromBoolean,
-  type NoteRow,
-  type NoteWithDetails,
   type CreateNoteInput,
-  type UpdateNoteInput,
-  type TaskInput,
-  type SyncStatus,
-  type NoteType,
-  type PaginatedResult,
   type NoteCursor,
+  type NoteRow,
+  type NoteType,
+  type NoteWithDetails,
+  type PaginatedResult,
+  type SyncStatus,
   type TaskFilter,
+  type TaskInput,
+  type UpdateNoteInput,
 } from '../database'
 
 export class NoteRepository {
@@ -573,6 +573,26 @@ export class NoteRepository {
     }
 
     if (existing) {
+      // Calculate attachment URL: preserve local path if filename matches
+      // This prevents Sync from overwriting local relative paths with server filenames
+      let attachmentUrl = serverNote.attachment?.url ?? null
+      if (
+        existing.attachment?.url &&
+        serverNote.attachment?.filename &&
+        existing.attachment?.filename === serverNote.attachment?.filename
+      ) {
+        attachmentUrl = existing.attachment.url
+      }
+
+      // Calculate attachment thumbnail: preserve local path if main attachment is preserved
+      let attachmentThumbnail = serverNote.attachment?.thumbnail ?? null
+      if (
+        attachmentUrl === existing.attachment?.url &&
+        existing.attachment?.thumbnail
+      ) {
+        attachmentThumbnail = existing.attachment.thumbnail
+      }
+
       // Update existing
       await this.db.runAsync(
         `UPDATE notes SET
@@ -588,12 +608,12 @@ export class NoteRepository {
         [
           serverNote.content ?? null,
           serverNote.type,
-          serverNote.attachment?.url ?? null,
+          attachmentUrl,
           serverNote.attachment?.filename ?? null,
           serverNote.attachment?.mimeType ?? null,
           serverNote.attachment?.size ?? null,
           serverNote.attachment?.duration ?? null,
-          serverNote.attachment?.thumbnail ?? null,
+          attachmentThumbnail,
           serverNote.attachment?.width ?? null,
           serverNote.attachment?.height ?? null,
           serverNote.location?.latitude ?? null,

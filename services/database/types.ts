@@ -1,7 +1,7 @@
 // Local database types for offline-first architecture
 
 export type SyncStatus = 'pending' | 'synced'
-export type NoteType = 'text' | 'image' | 'voice' | 'file' | 'location'
+export type NoteType = 'text' | 'image' | 'video' | 'voice' | 'file' | 'location' | 'contact' | 'audio'
 
 // Database row types (snake_case to match SQLite columns)
 export interface ThreadRow {

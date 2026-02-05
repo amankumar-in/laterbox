@@ -15,19 +15,8 @@
 
 # Do not use tamagui input fields if placeholder is needed. instead use react native
 
-not receiving reminder notification.
-
-Android Bundled 130ms node_modules/expo-router/entry.js (1 module)
- LOG  [Notifications] Android channel created
- LOG  [Sync] No pending changes to push
- LOG  [Sync] Pull completed successfully
- LOG  [Task] onSuccess: {"isCompleted": undefined, "isTask": true, "noteId": "45672c53-9e90-433e-987d-ec5c8d085156", "reminderAt": "2026-02-06T05:12:00.000Z"}
- LOG  [Task] Notification check: {"hasReminderAt": true, "isCompleted": undefined, "isTask": true}
- LOG  [Task] User taskReminders: true
- LOG  [Notifications] Scheduled: 4da2e7e4-53c7-4b66-ad5a-b49aa2224a55 for 2026-02-06T05:12:00.000Z
- LOG  [Notifications] Total scheduled: 3
- LOG  [Task] Notification result: 4da2e7e4-53c7-4b66-ad5a-b49aa2224a55
- LOG  [Sync] Push completed successfully
+i want to implement file and media sharing on my app. in thread view we have 6 share options  - images, video, document, location, contact, audio.    
+  Remember that we will not use permissions that we dont need. for instance to share media files just media picker is fine and no file permission is needed. for document i want to allow any type of file to be shared upto 100MB. location, contact, will work as they do on apps like whatsapp  
 
 
 tested with app in foreground, background both. do not make any edits. do not create any plans. only find the issue. use context7 mcp to learn.

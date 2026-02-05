@@ -6,12 +6,17 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Text, YStack } from 'tamagui'
 
+import { ImageViewerModal } from '../../../components/note/ImageViewerModal'
 import { NoteInput } from '../../../components/note/NoteInput'
 import { NoteList, NoteListRef } from '../../../components/note/NoteList'
 import { SelectionActionBar } from '../../../components/note/SelectionActionBar'
 import { ThreadHeader } from '../../../components/thread/ThreadHeader'
+import { VideoPlayerModal } from '../../../components/note/VideoPlayerModal'
+import { useAudioPlayer } from '../../../hooks/useAudioPlayer'
 import { useCompleteTask, useDeleteNote, useLockNote, useNotes, useSendNote, useSetNoteTask, useStarNote, useUpdateNote } from '../../../hooks/useNotes'
 import { useThread, useUpdateThread } from '../../../hooks/useThreads'
+import { useAttachmentHandler, type AttachmentResult } from '../../../hooks/useAttachmentHandler'
+import { setContactPickerCallback } from '../../../services/contactPickerStore'
 import type { NoteType, NoteWithDetails, ThreadWithLastNote } from '../../../types'
 
 export default function ThreadScreen() {
@@ -25,6 +30,15 @@ export default function ThreadScreen() {
   const [showAttachments, setShowAttachments] = useState(false)
   const [isEditingName, setIsEditingName] = useState(isNew === '1')
   const [editedName, setEditedName] = useState('')
+
+  // Attachment state
+  const [pendingAttachment, setPendingAttachment] = useState<AttachmentResult | null>(null)
+  const { showImageSourcePicker, showVideoSourcePicker, pickDocument, shareLocation, openContactPicker, pickAudio } = useAttachmentHandler()
+
+  // Media viewer state
+  const [viewingImageUri, setViewingImageUri] = useState<string | null>(null)
+  const [viewingVideoUri, setViewingVideoUri] = useState<string | null>(null)
+  const { playingNoteId, isPlaying: isAudioPlaying, toggle: toggleAudio } = useAudioPlayer()
 
   // Search state
   const [isSearching, setIsSearching] = useState(false)
@@ -147,6 +161,14 @@ export default function ThreadScreen() {
     console.log('Menu:', id)
   }, [id])
 
+  const handleImageView = useCallback((uri: string) => {
+    setViewingImageUri(uri)
+  }, [])
+
+  const handleVideoView = useCallback((uri: string) => {
+    setViewingVideoUri(uri)
+  }, [])
+
   const handleLoadMore = useCallback(() => {
     if (hasNextPage) {
       fetchNextPage()
@@ -172,6 +194,46 @@ export default function ThreadScreen() {
           content: note.content || '',
         })
         setEditingNote(null)
+        return
+      }
+
+      if (pendingAttachment) {
+        if (pendingAttachment.type === 'location') {
+          sendNoteMutation.mutate({
+            content: note.content,
+            type: 'location',
+            location: {
+              latitude: pendingAttachment.latitude!,
+              longitude: pendingAttachment.longitude!,
+              address: pendingAttachment.address,
+            },
+          })
+        } else if (pendingAttachment.type === 'contact') {
+          sendNoteMutation.mutate({
+            content: pendingAttachment.content,
+            type: 'contact',
+            attachment: {
+              url: 'contact',
+              filename: pendingAttachment.contactName,
+            },
+          })
+        } else {
+          sendNoteMutation.mutate({
+            content: note.content,
+            type: pendingAttachment.type,
+            attachment: {
+              url: pendingAttachment.localUri!,
+              filename: pendingAttachment.filename,
+              mimeType: pendingAttachment.mimeType,
+              size: pendingAttachment.size,
+              width: pendingAttachment.width,
+              height: pendingAttachment.height,
+              duration: pendingAttachment.duration,
+              thumbnail: pendingAttachment.thumbnail,
+            },
+          })
+        }
+        setPendingAttachment(null)
       } else {
         sendNoteMutation.mutate({
           content: note.content,
@@ -179,7 +241,7 @@ export default function ThreadScreen() {
         })
       }
     },
-    [editingNote, sendNoteMutation, updateNoteMutation]
+    [editingNote, sendNoteMutation, updateNoteMutation, pendingAttachment]
   )
 
   const isSelectionMode = selectedNoteIds.size > 0
@@ -328,13 +390,62 @@ export default function ThreadScreen() {
     }
   }, [completeTaskMutation, setNoteTaskMutation])
 
-  const handleAttachmentSelect = useCallback((type: string) => {
-    console.log('Selected attachment:', type)
-  }, [])
+  const handleAttachmentSelect = useCallback(async (type: string) => {
+    let result: AttachmentResult | null = null
+    switch (type) {
+      case 'image':
+        result = await showImageSourcePicker()
+        break
+      case 'video':
+        result = await showVideoSourcePicker()
+        break
+      case 'document':
+        result = await pickDocument()
+        break
+      case 'location':
+        result = await shareLocation()
+        break
+      case 'contact':
+        setContactPickerCallback((contactResult) => {
+          sendNoteMutation.mutate({
+            content: contactResult.content,
+            type: 'contact',
+            attachment: {
+              url: 'contact',
+              filename: contactResult.contactName,
+            },
+          })
+        })
+        openContactPicker()
+        return
+      case 'audio':
+        result = await pickAudio()
+        break
+    }
+    if (result) {
+      // Location and contact are sent immediately, no caption needed
+      if (result.type === 'location') {
+        sendNoteMutation.mutate({
+          type: 'location',
+          location: {
+            latitude: result.latitude!,
+            longitude: result.longitude!,
+            address: result.address,
+          },
+        })
+      } else {
+        setPendingAttachment(result)
+      }
+    }
+  }, [showImageSourcePicker, showVideoSourcePicker, pickDocument, shareLocation, openContactPicker, pickAudio, sendNoteMutation])
 
   const handleToggleAttachments = useCallback(() => {
     Keyboard.dismiss()
     setShowAttachments((prev) => !prev)
+  }, [])
+
+  const handleClearAttachment = useCallback(() => {
+    setPendingAttachment(null)
   }, [])
 
 
@@ -407,6 +518,11 @@ export default function ThreadScreen() {
           onNoteLongPress={handleNoteLongPress}
           onNotePress={handleNotePress}
           onTaskToggle={handleTaskToggle}
+          onImageView={handleImageView}
+          onVideoView={handleVideoView}
+          onAudioToggle={toggleAudio}
+          playingNoteId={playingNoteId}
+          isAudioPlaying={isAudioPlaying}
           highlightedNoteId={highlightedNoteId}
           selectedNoteIds={selectedNoteIds}
         />
@@ -441,9 +557,20 @@ export default function ThreadScreen() {
             onCancelEdit={handleCancelEdit}
             showAttachments={showAttachments}
             onToggleAttachments={handleToggleAttachments}
+            pendingAttachment={pendingAttachment}
+            onClearAttachment={handleClearAttachment}
           />
         )}
       </KeyboardAvoidingView>
+
+      <ImageViewerModal
+        uri={viewingImageUri}
+        onClose={() => setViewingImageUri(null)}
+      />
+      <VideoPlayerModal
+        uri={viewingVideoUri}
+        onClose={() => setViewingVideoUri(null)}
+      />
 
       {showDatePicker && (
         <DateTimePicker

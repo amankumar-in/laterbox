@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { XStack, YStack, Text } from 'tamagui'
-import { Pressable } from 'react-native'
+import { Alert, Linking, Pressable } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
+import { Image } from 'expo-image'
+import FileViewer from 'react-native-file-viewer'
 import { useThemeColor } from '../../hooks/useThemeColor'
+import { resolveAttachmentUri } from '../../services/fileStorage'
 import type { NoteWithDetails } from '../../types'
 
 interface NoteBubbleProps {
@@ -10,6 +13,11 @@ interface NoteBubbleProps {
   onLongPress: (note: NoteWithDetails) => void
   onPress?: (note: NoteWithDetails) => void
   onTaskToggle?: (note: NoteWithDetails) => void
+  onImageView?: (uri: string) => void
+  onVideoView?: (uri: string) => void
+  onAudioToggle?: (noteId: string, uri: string) => void
+  playingNoteId?: string | null
+  isAudioPlaying?: boolean
   isHighlighted?: boolean
   isSelected?: boolean
 }
@@ -29,9 +37,28 @@ function formatDuration(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function openDocument(storedPath: string) {
+  const uri = resolveAttachmentUri(storedPath)
+  const path = uri.startsWith('file://') ? uri.slice(7) : uri
+  FileViewer.open(path).catch(() => {
+    Alert.alert('Cannot Open', 'No app available to open this file.')
+  })
+}
+
+function openInMaps(location?: { latitude: number; longitude: number; address?: string } | null) {
+  if (!location) return
+  Linking.openURL(`https://maps.google.com/?q=${location.latitude},${location.longitude}`)
+}
+
 const MAX_LINES = 30
 
-export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, isHighlighted = false, isSelected = false }: NoteBubbleProps) {
+export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageView, onVideoView, onAudioToggle, playingNoteId, isAudioPlaying, isHighlighted = false, isSelected = false }: NoteBubbleProps) {
   const { brandText, iconColor, accentColor, background } = useThemeColor()
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -60,16 +87,30 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, isHighlig
       case 'image':
         return (
           <YStack>
-            <XStack
-              backgroundColor="$backgroundStrong"
-              borderRadius="$3"
-              width={200}
-              height={150}
-              alignItems="center"
-              justifyContent="center"
-            >
-              <Ionicons name="image" size={40} color={iconColor} />
-            </XStack>
+            {note.attachment?.url ? (
+              <Pressable onPress={() => {
+                if (note.attachment?.url) {
+                  onImageView?.(resolveAttachmentUri(note.attachment.url))
+                }
+              }}>
+                <Image
+                  source={{ uri: resolveAttachmentUri(note.attachment.url) }}
+                  style={{ width: 200, height: 150, borderRadius: 8 }}
+                  contentFit="cover"
+                />
+              </Pressable>
+            ) : (
+              <XStack
+                backgroundColor="$backgroundStrong"
+                borderRadius="$3"
+                width={200}
+                height={150}
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Ionicons name="image" size={40} color={iconColor} />
+              </XStack>
+            )}
             {note.content && (
               <Text fontSize="$4" marginTop="$2" color={brandText}>
                 {note.content}
@@ -78,76 +119,216 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, isHighlig
           </YStack>
         )
 
-      case 'voice':
-        return (
-          <XStack alignItems="center" gap="$2" minWidth={180}>
-            <XStack
-              width={36}
-              height={36}
-              borderRadius={18}
-              backgroundColor={background}
-              alignItems="center"
-              justifyContent="center"
-            >
-              <Ionicons name="play" size={20} color={accentColor} />
-            </XStack>
-            <YStack flex={1} gap="$1">
-              <XStack height={20} backgroundColor="$blue8" borderRadius="$2" />
-              <Text fontSize="$2" color="$blue12">
-                {note.attachment?.duration
-                  ? formatDuration(note.attachment.duration)
-                  : '0:00'}
-              </Text>
-            </YStack>
-          </XStack>
-        )
-
-      case 'file':
-        return (
-          <XStack alignItems="center" gap="$2" minWidth={180}>
-            <XStack
-              width={40}
-              height={40}
-              borderRadius="$2"
-              backgroundColor="$blue8"
-              alignItems="center"
-              justifyContent="center"
-            >
-              <Ionicons name="document" size={24} color={brandText} />
-            </XStack>
-            <YStack flex={1}>
-              <Text fontSize="$3" fontWeight="500" numberOfLines={1} color={brandText}>
-                {note.attachment?.filename || 'File'}
-              </Text>
-              <Text fontSize="$2" color="$blue12">
-                {note.attachment?.size
-                  ? `${(note.attachment.size / 1024).toFixed(1)} KB`
-                  : ''}
-              </Text>
-            </YStack>
-          </XStack>
-        )
-
-      case 'location':
+      case 'video':
         return (
           <YStack>
-            <XStack
-              backgroundColor="$backgroundStrong"
-              borderRadius="$3"
-              width={200}
-              height={120}
-              alignItems="center"
-              justifyContent="center"
-            >
-              <Ionicons name="location" size={40} color={iconColor} />
-            </XStack>
-            {note.location?.address && (
-              <Text fontSize="$3" marginTop="$2" color="$blue12">
-                {note.location.address}
+            <Pressable onPress={() => {
+              if (note.attachment?.url) {
+                onVideoView?.(resolveAttachmentUri(note.attachment.url))
+              }
+            }}>
+              <XStack position="relative">
+                {note.attachment?.thumbnail ? (
+                  <Image
+                    source={{ uri: resolveAttachmentUri(note.attachment.thumbnail) }}
+                    style={{ width: 200, height: 150, borderRadius: 8 }}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <XStack
+                    backgroundColor="$backgroundStrong"
+                    borderRadius="$3"
+                    width={200}
+                    height={150}
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <Ionicons name="videocam" size={40} color={iconColor} />
+                  </XStack>
+                )}
+                <XStack
+                  position="absolute"
+                  top={0}
+                  left={0}
+                  right={0}
+                  bottom={0}
+                  alignItems="center"
+                  justifyContent="center"
+                >
+                  <XStack
+                    width={44}
+                    height={44}
+                    borderRadius={22}
+                    backgroundColor="rgba(0,0,0,0.5)"
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <Ionicons name="play" size={24} color="#fff" />
+                  </XStack>
+                </XStack>
+                {note.attachment?.duration != null && (
+                  <XStack
+                    position="absolute"
+                    bottom={4}
+                    right={4}
+                    backgroundColor="rgba(0,0,0,0.6)"
+                    borderRadius={4}
+                    paddingHorizontal="$1"
+                  >
+                    <Text color="#fff" fontSize={10}>
+                      {formatDuration(note.attachment.duration)}
+                    </Text>
+                  </XStack>
+                )}
+              </XStack>
+            </Pressable>
+            {note.content && (
+              <Text fontSize="$4" marginTop="$2" color={brandText}>
+                {note.content}
               </Text>
             )}
           </YStack>
         )
+
+      case 'voice': {
+        const isThisPlaying = playingNoteId === note.id && isAudioPlaying
+        return (
+          <Pressable onPress={() => {
+            if (note.attachment?.url) {
+              onAudioToggle?.(note.id, resolveAttachmentUri(note.attachment.url))
+            }
+          }}>
+            <XStack alignItems="center" gap="$2" minWidth={180}>
+              <XStack
+                width={36}
+                height={36}
+                borderRadius={18}
+                backgroundColor={background}
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Ionicons name={isThisPlaying ? 'pause' : 'play'} size={20} color={accentColor} />
+              </XStack>
+              <YStack flex={1} gap="$1">
+                <XStack height={20} backgroundColor="$blue8" borderRadius="$2" />
+                <Text fontSize="$2" color="$blue12">
+                  {note.attachment?.duration
+                    ? formatDuration(note.attachment.duration)
+                    : '0:00'}
+                </Text>
+              </YStack>
+            </XStack>
+          </Pressable>
+        )
+      }
+
+      case 'file':
+        return (
+          <Pressable onPress={() => note.attachment?.url && openDocument(note.attachment.url)}>
+            <XStack alignItems="center" gap="$2" minWidth={180}>
+              <XStack
+                width={40}
+                height={40}
+                borderRadius="$2"
+                backgroundColor="$blue8"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Ionicons name="document" size={24} color={brandText} />
+              </XStack>
+              <YStack flex={1}>
+                <Text fontSize="$3" fontWeight="500" numberOfLines={1} color={brandText}>
+                  {note.attachment?.filename || 'File'}
+                </Text>
+                <Text fontSize="$2" color="$blue12">
+                  {note.attachment?.size ? formatFileSize(note.attachment.size) : ''}
+                </Text>
+              </YStack>
+            </XStack>
+          </Pressable>
+        )
+
+      case 'location':
+        return (
+          <Pressable onPress={() => openInMaps(note.location)}>
+            <YStack>
+              <XStack
+                backgroundColor="$backgroundStrong"
+                borderRadius="$3"
+                width={200}
+                height={120}
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Ionicons name="location" size={40} color={iconColor} />
+              </XStack>
+              <XStack alignItems="center" gap="$1" marginTop="$1">
+                <Ionicons name="navigate" size={12} color={accentColor} />
+                <Text fontSize="$3" color={accentColor} numberOfLines={2} flex={1}>
+                  {note.location?.address || 'Shared location'}
+                </Text>
+              </XStack>
+            </YStack>
+          </Pressable>
+        )
+
+      case 'contact':
+        return (
+          <YStack gap="$1" minWidth={180}>
+            <XStack alignItems="center" gap="$2">
+              <XStack
+                width={40}
+                height={40}
+                borderRadius={20}
+                backgroundColor="$orange5"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Ionicons name="person" size={22} color={iconColor} />
+              </XStack>
+              <Text fontSize="$4" fontWeight="600" color={brandText}>
+                {note.attachment?.filename || 'Contact'}
+              </Text>
+            </XStack>
+            {note.content && (
+              <Text fontSize="$3" color="$blue12" numberOfLines={4}>
+                {note.content}
+              </Text>
+            )}
+          </YStack>
+        )
+
+      case 'audio': {
+        const isThisPlaying = playingNoteId === note.id && isAudioPlaying
+        return (
+          <Pressable onPress={() => {
+            if (note.attachment?.url) {
+              onAudioToggle?.(note.id, resolveAttachmentUri(note.attachment.url))
+            }
+          }}>
+            <XStack alignItems="center" gap="$2" minWidth={180}>
+              <XStack
+                width={36}
+                height={36}
+                borderRadius={18}
+                backgroundColor="$pink5"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Ionicons name={isThisPlaying ? 'pause' : 'musical-notes'} size={20} color={iconColor} />
+              </XStack>
+              <YStack flex={1}>
+                <Text fontSize="$3" fontWeight="500" numberOfLines={1} color={brandText}>
+                  {note.attachment?.filename || 'Audio'}
+                </Text>
+                <Text fontSize="$2" color="$blue12">
+                  {note.attachment?.size ? formatFileSize(note.attachment.size) : ''}
+                </Text>
+              </YStack>
+            </XStack>
+          </Pressable>
+        )
+      }
 
       default: {
         const displayContent = !isExpanded && needsTruncation

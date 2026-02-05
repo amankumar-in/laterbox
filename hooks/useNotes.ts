@@ -6,7 +6,8 @@ import {
   scheduleTaskReminder,
   cancelReminder,
 } from '@/services/notifications/notification.service'
-import type { NoteWithDetails, PaginatedResult, NoteType } from '@/services/database/types'
+import type { NoteWithDetails, PaginatedResult, NoteType, CreateNoteInput } from '@/services/database/types'
+import { deleteAttachment } from '@/services/fileStorage'
 
 export function useNotes(threadId: string, params?: { limit?: number; isSystemThread?: boolean }) {
   const db = useDb()
@@ -43,17 +44,37 @@ export function useSendNote(threadId: string) {
   const { schedulePush } = useSyncService()
 
   return useMutation({
-    mutationFn: async (data: { content?: string; type: NoteType }) => {
+    mutationFn: async (data: {
+      content?: string
+      type: NoteType
+      attachment?: CreateNoteInput['attachment']
+      location?: CreateNoteInput['location']
+    }) => {
       const note = await noteRepo.create({
         threadId,
         content: data.content,
         type: data.type,
+        attachment: data.attachment,
+        location: data.location,
       })
+
+      // Build meaningful lastNote content for non-text types
+      let lastNoteContent = data.content ?? null
+      if (!lastNoteContent) {
+        switch (data.type) {
+          case 'image': lastNoteContent = 'Photo'; break
+          case 'video': lastNoteContent = 'Video'; break
+          case 'file': lastNoteContent = data.attachment?.filename || 'File'; break
+          case 'location': lastNoteContent = data.location?.address || 'Location'; break
+          case 'contact': lastNoteContent = data.attachment?.filename || 'Contact'; break
+          case 'audio': lastNoteContent = data.attachment?.filename || 'Audio'; break
+        }
+      }
 
       // Update thread's last note
       await threadRepo.updateLastNote(
         threadId,
-        data.content ?? null,
+        lastNoteContent,
         data.type,
         note.createdAt
       )
@@ -93,10 +114,18 @@ export function useDeleteNote(threadId: string) {
 
   return useMutation({
     mutationFn: async (noteId: string) => {
-      // Cancel any scheduled notification before deleting
       const note = await noteRepo.getById(noteId)
+      // Cancel any scheduled notification before deleting
       if (note?.task.notificationId) {
         await cancelReminder(note.task.notificationId)
+      }
+      // Delete local attachment file if exists (relative paths or file:// URIs)
+      if (note?.attachment?.url && !note.attachment.url.startsWith('http')) {
+        await deleteAttachment(note.attachment.url)
+        // Also delete thumbnail if present
+        if (note.attachment.thumbnail && !note.attachment.thumbnail.startsWith('http')) {
+          await deleteAttachment(note.attachment.thumbnail)
+        }
       }
       await noteRepo.delete(noteId)
     },

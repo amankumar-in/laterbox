@@ -36,13 +36,19 @@ function getNotePreview(thread: ThreadWithLastNote): string {
 
   switch (thread.lastNote.type) {
     case 'image':
-      return '📷 Photo'
+      return thread.lastNote.content || '📷 Photo'
+    case 'video':
+      return thread.lastNote.content || '🎬 Video'
     case 'voice':
       return '🎤 Voice note'
     case 'file':
-      return '📎 File'
+      return `📄 ${thread.lastNote.content || 'File'}`
     case 'location':
       return '📍 Location'
+    case 'contact':
+      return `👤 ${thread.lastNote.content || 'Contact'}`
+    case 'audio':
+      return `🎵 ${thread.lastNote.content || 'Audio'}`
     default:
       return thread.lastNote.content || ''
   }

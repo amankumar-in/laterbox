@@ -2,14 +2,15 @@ import { Ionicons } from '@expo/vector-icons'
 import { Directory, Paths } from 'expo-file-system/next'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { Database, SunMoon } from 'lucide-react-native'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Alert, Image, ScrollView, Switch } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button, Separator, Text, XStack, YStack } from 'tamagui'
 import { useThemeColor } from '../../hooks/useThemeColor'
+import { useSyncService } from '../../hooks/useSyncService'
 import { useDeleteAccount, useUpdateUser, useUser } from '../../hooks/useUser'
 import { deleteAccountInfo, deleteRemoteData, logout } from '../../services/api'
-import { clearAll } from '../../services/storage'
+import { clearAll, getSyncEnabled, setSyncEnabled } from '../../services/storage'
 import { useDb } from '@/contexts/DatabaseContext'
 import { getNoteRepository } from '@/services/repositories'
 import {
@@ -166,6 +167,7 @@ export default function SettingsScreen() {
   const db = useDb()
   const { data: user, refetch: refetchUser } = useUser()
   const updateUser = useUpdateUser()
+  const { push, pull } = useSyncService()
 
   // Refetch user when screen comes into focus
   useFocusEffect(
@@ -177,6 +179,11 @@ export default function SettingsScreen() {
   // User must have at least one identifier for sync to work
   const hasIdentity = !!(user?.username || user?.email || user?.phone)
   const [dataSyncEnabled, setDataSyncEnabled] = useState(hasIdentity)
+
+  // Load persisted sync preference on mount (otherwise restart would show default)
+  useEffect(() => {
+    getSyncEnabled().then(setDataSyncEnabled)
+  }, [])
 
   const handleBack = useCallback(() => {
     router.back()
@@ -515,6 +522,18 @@ export default function SettingsScreen() {
               return
             }
             setDataSyncEnabled(value)
+            setSyncEnabled(value).then(() => {
+              if (value) {
+                push()
+                  .catch((e) => {
+                    if (e?.message !== 'AUTH_CLEARED') console.warn('[Settings] Sync on: push failed', e?.message)
+                  })
+                  .then(() => pull())
+                  .catch((e) => {
+                    if (e?.message !== 'AUTH_CLEARED') console.warn('[Settings] Sync on: pull failed', e?.message)
+                  })
+              }
+            })
           }}
           trackColor={accentColor}
         />

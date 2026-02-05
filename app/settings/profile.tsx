@@ -1,29 +1,29 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
-import { ScrollView, Alert, Image, Pressable, Modal, TextInput, FlatList } from 'react-native'
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
-import { YStack, XStack, Text, Button, Spinner } from 'tamagui'
-import { useRouter } from 'expo-router'
-import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
-import { Country, CountryCode, getAllCountries, FlagType } from 'react-native-country-picker-modal'
+import { useRouter } from 'expo-router'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { Alert, FlatList, Image, Modal, Pressable, ScrollView, TextInput } from 'react-native'
+import { Country, CountryCode, FlagType, getAllCountries } from 'react-native-country-picker-modal'
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Button, Spinner, Text, XStack, YStack } from 'tamagui'
 
 import { useQueryClient } from '@tanstack/react-query'
-import { useThemeColor } from '../../hooks/useThemeColor'
-import { useUser, useUpdateUser, useIsAuthenticated } from '../../hooks/useUser'
-import {
-  signup,
-  login,
-  getPasswordStatus,
-  setPassword as setPasswordApi,
-  changePassword as changePasswordApi,
-  checkUsername as checkUsernameApi,
-  sendPhoneCode as sendPhoneCodeApi,
-  verifyPhoneCode as verifyPhoneCodeApi,
-  sendEmailCode as sendEmailCodeApi,
-  verifyEmailCode as verifyEmailCodeApi,
-} from '../../services/api'
 import { useSyncService } from '../../hooks/useSyncService'
+import { useThemeColor } from '../../hooks/useThemeColor'
+import { useIsAuthenticated, useUpdateUser, useUser } from '../../hooks/useUser'
+import {
+    changePassword as changePasswordApi,
+    checkUsername as checkUsernameApi,
+    getPasswordStatus,
+    login,
+    sendEmailCode as sendEmailCodeApi,
+    sendPhoneCode as sendPhoneCodeApi,
+    setPassword as setPasswordApi,
+    signup,
+    verifyEmailCode as verifyEmailCodeApi,
+    verifyPhoneCode as verifyPhoneCodeApi,
+} from '../../services/api'
 
 function getInitials(name: string): string {
   const words = name.trim().split(/\s+/)

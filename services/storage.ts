@@ -7,6 +7,7 @@ const DEVICE_ID_KEY = '@mneme:deviceId'
 const USER_KEY = '@mneme:user'
 const AUTH_TOKEN_KEY = '@mneme:authToken'
 const THEME_KEY = '@mneme:appTheme'
+const SYNC_ENABLED_KEY = '@mneme:syncEnabled'
 
 export type AppTheme = 'light' | 'dark' | 'system'
 
@@ -18,6 +19,17 @@ export async function getAppTheme(): Promise<AppTheme> {
 
 export async function setAppTheme(theme: AppTheme): Promise<void> {
   await AsyncStorage.setItem(THEME_KEY, theme)
+}
+
+/** Sync enabled preference. Default true when key is missing (backward compat). */
+export async function getSyncEnabled(): Promise<boolean> {
+  const stored = await AsyncStorage.getItem(SYNC_ENABLED_KEY)
+  if (stored === 'false') return false
+  return true
+}
+
+export async function setSyncEnabled(enabled: boolean): Promise<void> {
+  await AsyncStorage.setItem(SYNC_ENABLED_KEY, enabled ? 'true' : 'false')
 }
 
 function generateId(): string {
@@ -69,7 +81,7 @@ export async function clearAuthToken(): Promise<void> {
 }
 
 export async function clearAll(): Promise<void> {
-  await AsyncStorage.multiRemove([DEVICE_ID_KEY, USER_KEY, AUTH_TOKEN_KEY, THEME_KEY])
+  await AsyncStorage.multiRemove([DEVICE_ID_KEY, USER_KEY, AUTH_TOKEN_KEY, THEME_KEY, SYNC_ENABLED_KEY])
 }
 
 /**

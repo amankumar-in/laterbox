@@ -49,10 +49,13 @@ export function useExportThread() {
           const date = `${day} ${month} ${year}, ${time}`
           let content = note.content || ''
 
-          if (note.type === 'image') content = '[Image]'
+          if (note.type === 'image') content = note.content ? `[Image] ${note.content}` : '[Image]'
+          else if (note.type === 'video') content = note.content ? `[Video] ${note.content}` : '[Video]'
           else if (note.type === 'voice') content = '[Voice Note]'
           else if (note.type === 'file') content = `[File: ${note.attachment?.filename || 'attachment'}]`
           else if (note.type === 'location') content = `[Location: ${note.location?.address || 'shared location'}]`
+          else if (note.type === 'contact') content = `[Contact: ${note.attachment?.filename || 'contact'}]`
+          else if (note.type === 'audio') content = `[Audio: ${note.attachment?.filename || 'audio'}]`
 
           if (note.task.isTask) {
             content = `[${note.task.isCompleted ? '✓' : '○'}] ${content}`
