@@ -18,8 +18,26 @@ interface NoteBubbleProps {
   onAudioToggle?: (noteId: string, uri: string) => void
   playingNoteId?: string | null
   isAudioPlaying?: boolean
+  audioPositionMs?: number
+  audioDurationMs?: number
   isHighlighted?: boolean
   isSelected?: boolean
+}
+
+const WAVEFORM_BAR_COUNT = 28
+
+function generateWaveform(noteId: string): number[] {
+  let hash = 0
+  for (let i = 0; i < noteId.length; i++) {
+    hash = ((hash << 5) - hash + noteId.charCodeAt(i)) | 0
+  }
+  const bars: number[] = []
+  for (let i = 0; i < WAVEFORM_BAR_COUNT; i++) {
+    hash = (hash * 1664525 + 1013904223) | 0
+    const value = Math.abs(hash % 100) / 100
+    bars.push(0.15 + value * 0.85)
+  }
+  return bars
 }
 
 function formatTime(dateString: string): string {
@@ -58,7 +76,7 @@ function openInMaps(location?: { latitude: number; longitude: number; address?: 
 
 const MAX_LINES = 30
 
-export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageView, onVideoView, onAudioToggle, playingNoteId, isAudioPlaying, isHighlighted = false, isSelected = false }: NoteBubbleProps) {
+export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageView, onVideoView, onAudioToggle, playingNoteId, isAudioPlaying, audioPositionMs = 0, audioDurationMs = 0, isHighlighted = false, isSelected = false }: NoteBubbleProps) {
   const { brandText, iconColor, accentColor, background } = useThemeColor()
   const [isExpanded, setIsExpanded] = useState(false)
 
@@ -192,33 +210,58 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
 
       case 'voice': {
         const isThisPlaying = playingNoteId === note.id && isAudioPlaying
+        const isThisActive = playingNoteId === note.id
+        const waveformBars = generateWaveform(note.id)
+        const totalDurationMs = (note.attachment?.duration || 0) * 1000
+        const progressRatio = isThisActive && audioDurationMs > 0
+          ? audioPositionMs / audioDurationMs
+          : 0
+        const playedBars = Math.floor(progressRatio * WAVEFORM_BAR_COUNT)
+        const displayTime = isThisActive
+          ? formatDuration(audioPositionMs / 1000)
+          : formatDuration(note.attachment?.duration || 0)
         return (
-          <Pressable onPress={() => {
-            if (note.attachment?.url) {
-              onAudioToggle?.(note.id, resolveAttachmentUri(note.attachment.url))
-            }
-          }}>
-            <XStack alignItems="center" gap="$2" minWidth={180}>
-              <XStack
-                width={36}
-                height={36}
-                borderRadius={18}
-                backgroundColor={background}
-                alignItems="center"
-                justifyContent="center"
-              >
-                <Ionicons name={isThisPlaying ? 'pause' : 'play'} size={20} color={accentColor} />
+          <YStack>
+            <Pressable onPress={() => {
+              if (note.attachment?.url) {
+                onAudioToggle?.(note.id, resolveAttachmentUri(note.attachment.url))
+              }
+            }}>
+              <XStack alignItems="center" gap="$2" minWidth={200}>
+                <XStack
+                  width={36}
+                  height={36}
+                  borderRadius={18}
+                  backgroundColor={background}
+                  alignItems="center"
+                  justifyContent="center"
+                >
+                  <Ionicons name={isThisPlaying ? 'pause' : 'play'} size={20} color={accentColor} />
+                </XStack>
+                <YStack flex={1} gap="$1">
+                  <XStack height={28} alignItems="center" gap={2}>
+                    {waveformBars.map((level, i) => (
+                      <YStack
+                        key={i}
+                        width={3}
+                        borderRadius={1.5}
+                        height={Math.max(4, level * 24)}
+                        backgroundColor={i < playedBars ? '$color' : '$blue8'}
+                      />
+                    ))}
+                  </XStack>
+                  <Text fontSize="$2" color="$blue12">
+                    {displayTime}
+                  </Text>
+                </YStack>
               </XStack>
-              <YStack flex={1} gap="$1">
-                <XStack height={20} backgroundColor="$blue8" borderRadius="$2" />
-                <Text fontSize="$2" color="$blue12">
-                  {note.attachment?.duration
-                    ? formatDuration(note.attachment.duration)
-                    : '0:00'}
-                </Text>
-              </YStack>
-            </XStack>
-          </Pressable>
+            </Pressable>
+            {note.content && (
+              <Text fontSize="$4" marginTop="$2" color={brandText}>
+                {note.content}
+              </Text>
+            )}
+          </YStack>
         )
       }
 

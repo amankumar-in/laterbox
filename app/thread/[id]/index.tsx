@@ -13,6 +13,7 @@ import { SelectionActionBar } from '../../../components/note/SelectionActionBar'
 import { ThreadHeader } from '../../../components/thread/ThreadHeader'
 import { VideoPlayerModal } from '../../../components/note/VideoPlayerModal'
 import { useAudioPlayer } from '../../../hooks/useAudioPlayer'
+import { useVoiceRecorder } from '../../../hooks/useVoiceRecorder'
 import { useCompleteTask, useDeleteNote, useLockNote, useNotes, useSendNote, useSetNoteTask, useStarNote, useUpdateNote } from '../../../hooks/useNotes'
 import { useThread, useUpdateThread } from '../../../hooks/useThreads'
 import { useAttachmentHandler, type AttachmentResult } from '../../../hooks/useAttachmentHandler'
@@ -38,7 +39,8 @@ export default function ThreadScreen() {
   // Media viewer state
   const [viewingImageUri, setViewingImageUri] = useState<string | null>(null)
   const [viewingVideoUri, setViewingVideoUri] = useState<string | null>(null)
-  const { playingNoteId, isPlaying: isAudioPlaying, toggle: toggleAudio } = useAudioPlayer()
+  const { playingNoteId, isPlaying: isAudioPlaying, positionMs: audioPositionMs, durationMs: audioDurationMs, toggle: toggleAudio } = useAudioPlayer()
+  const { isRecording: isVoiceRecording, duration: voiceDuration, meteringLevels: voiceMeteringLevels, startRecording, stopRecording, cancelRecording } = useVoiceRecorder()
 
   // Search state
   const [isSearching, setIsSearching] = useState(false)
@@ -449,13 +451,21 @@ export default function ThreadScreen() {
   }, [])
 
 
-  const handleVoiceStart = useCallback(() => {
-    console.log('Start voice recording')
-  }, [])
+  const handleVoiceToggle = useCallback(async () => {
+    if (isVoiceRecording) {
+      const result = await stopRecording()
+      if (result) {
+        setPendingAttachment(result)
+      }
+    } else {
+      setShowAttachments(false)
+      await startRecording()
+    }
+  }, [isVoiceRecording, stopRecording, startRecording])
 
-  const handleVoiceEnd = useCallback((uri: string) => {
-    console.log('End voice recording:', uri)
-  }, [])
+  const handleVoiceCancel = useCallback(async () => {
+    await cancelRecording()
+  }, [cancelRecording])
 
   const handleCancelEdit = useCallback(() => {
     setEditingNote(null)
@@ -523,6 +533,8 @@ export default function ThreadScreen() {
           onAudioToggle={toggleAudio}
           playingNoteId={playingNoteId}
           isAudioPlaying={isAudioPlaying}
+          audioPositionMs={audioPositionMs}
+          audioDurationMs={audioDurationMs}
           highlightedNoteId={highlightedNoteId}
           selectedNoteIds={selectedNoteIds}
         />
@@ -551,8 +563,11 @@ export default function ThreadScreen() {
           <NoteInput
             onSend={handleSend}
             onAttachmentSelect={handleAttachmentSelect}
-            onVoiceStart={handleVoiceStart}
-            onVoiceEnd={handleVoiceEnd}
+            onVoiceToggle={handleVoiceToggle}
+            onVoiceCancel={handleVoiceCancel}
+            isVoiceRecording={isVoiceRecording}
+            voiceDuration={voiceDuration}
+            voiceMeteringLevels={voiceMeteringLevels}
             editingNote={editingNote}
             onCancelEdit={handleCancelEdit}
             showAttachments={showAttachments}

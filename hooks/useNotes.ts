@@ -68,6 +68,7 @@ export function useSendNote(threadId: string) {
           case 'location': lastNoteContent = data.location?.address || 'Location'; break
           case 'contact': lastNoteContent = data.attachment?.filename || 'Contact'; break
           case 'audio': lastNoteContent = data.attachment?.filename || 'Audio'; break
+          case 'voice': lastNoteContent = 'Voice note'; break
         }
       }
 

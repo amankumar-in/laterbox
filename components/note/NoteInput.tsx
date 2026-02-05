@@ -17,11 +17,20 @@ const attachmentOptions = [
   { id: 'audio', icon: 'musical-notes-outline', label: 'Audio', color: '$pink5' },
 ] as const
 
+function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
 interface NoteInputProps {
   onSend: (note: { content?: string; type: NoteType }) => void
   onAttachmentSelect: (type: string) => void
-  onVoiceStart: () => void
-  onVoiceEnd: (uri: string) => void
+  onVoiceToggle: () => void
+  onVoiceCancel: () => void
+  isVoiceRecording?: boolean
+  voiceDuration?: number
+  voiceMeteringLevels?: number[]
   editingNote?: NoteWithDetails | null
   onCancelEdit?: () => void
   showAttachments: boolean
@@ -33,8 +42,11 @@ interface NoteInputProps {
 export function NoteInput({
   onSend,
   onAttachmentSelect,
-  onVoiceStart,
-  onVoiceEnd,
+  onVoiceToggle,
+  onVoiceCancel,
+  isVoiceRecording = false,
+  voiceDuration = 0,
+  voiceMeteringLevels = [],
   editingNote,
   onCancelEdit,
   showAttachments,
@@ -44,7 +56,6 @@ export function NoteInput({
 }: NoteInputProps) {
   const { iconColor, brandText, placeholderColor, color } = useThemeColor()
   const [text, setText] = useState('')
-  const [isRecording, setIsRecording] = useState(false)
   const inputRef = useRef<TextInput>(null)
 
   // Populate input with note content when editing, clear when done
@@ -76,20 +87,6 @@ export function NoteInput({
     }
   }, [text, onSend, pendingAttachment, onClearAttachment])
 
-  const handleVoicePress = useCallback(() => {
-    if (!isRecording) {
-      setIsRecording(true)
-      onVoiceStart()
-    }
-  }, [isRecording, onVoiceStart])
-
-  const handleVoiceRelease = useCallback(() => {
-    if (isRecording) {
-      setIsRecording(false)
-      onVoiceEnd('')
-    }
-  }, [isRecording, onVoiceEnd])
-
   const handleAttachmentPress = useCallback((id: string) => {
     onToggleAttachments()
     onAttachmentSelect(id)
@@ -98,7 +95,7 @@ export function NoteInput({
   const hasText = text.trim().length > 0
   const canSend = hasText || !!pendingAttachment
 
-  const attachmentPanel = showAttachments && (
+  const attachmentPanel = showAttachments && !isVoiceRecording && (
     <XStack
       backgroundColor="$background"
       paddingHorizontal="$4"
@@ -139,6 +136,9 @@ export function NoteInput({
       case 'video': return pendingAttachment.filename || 'Video'
       case 'file': return pendingAttachment.filename || 'Document'
       case 'audio': return pendingAttachment.filename || 'Audio'
+      case 'voice': return pendingAttachment.duration
+        ? `Voice note (${formatTime(pendingAttachment.duration)})`
+        : 'Voice note'
       default: return 'Attachment'
     }
   }
@@ -150,6 +150,7 @@ export function NoteInput({
       case 'video': return 'videocam'
       case 'file': return 'document'
       case 'audio': return 'musical-notes'
+      case 'voice': return 'mic'
       default: return 'attach'
     }
   }
@@ -162,7 +163,7 @@ export function NoteInput({
     >
       {attachmentPanel}
 
-      {pendingAttachment && (
+      {!isVoiceRecording && pendingAttachment && (
         <XStack
           backgroundColor="$backgroundStrong"
           paddingLeft="$3"
@@ -198,7 +199,7 @@ export function NoteInput({
         </XStack>
       )}
 
-      {editingNote && (
+      {!isVoiceRecording && editingNote && (
         <XStack
           backgroundColor="$backgroundStrong"
           paddingLeft="$4"
@@ -220,81 +221,124 @@ export function NoteInput({
         </XStack>
       )}
 
-      <XStack
-        paddingHorizontal="$2"
-        paddingVertical="$2"
-        alignItems="flex-end"
-        gap="$2"
-      >
-        <Button
-          size="$3"
-          circular
-          chromeless
-          onPress={onToggleAttachments}
-          icon={<Ionicons name={showAttachments ? 'close' : 'attach-outline'} size={24} color={iconColor} />}
-        />
-
+      {isVoiceRecording ? (
         <XStack
-          flex={1}
-          backgroundColor="$backgroundStrong"
-          borderRadius="$4"
-          minHeight={44}
-          maxHeight={120}
-          alignItems="center"
-        >
-          <TextInput
-            ref={inputRef}
-            style={{ flex: 1, fontSize: 16, color, paddingHorizontal: 12 }}
-            placeholder={pendingAttachment ? 'Add a caption...' : 'Type a note...'}
-            placeholderTextColor={placeholderColor}
-            value={text}
-            onChangeText={setText}
-            multiline
-            maxLength={5000}
-            returnKeyType="default"
-          />
-        </XStack>
-
-        {canSend ? (
-          <Button
-            size="$4"
-            circular
-            backgroundColor="$brandBackground"
-            pressStyle={{ backgroundColor: '$brandBackgroundHover', scale: 0.95 }}
-            onPress={handleSend}
-            icon={<Ionicons name="send" size={20} color={brandText} />}
-          />
-        ) : (
-          <Button
-            size="$4"
-            circular
-            backgroundColor={isRecording ? '$errorColor' : '$brandBackground'}
-            pressStyle={{ backgroundColor: isRecording ? '$errorColor' : '$brandBackgroundHover', scale: 0.95 }}
-            onPressIn={handleVoicePress}
-            onPressOut={handleVoiceRelease}
-            icon={<Ionicons name="mic" size={20} color={brandText} />}
-          />
-        )}
-      </XStack>
-
-      {isRecording && (
-        <XStack
-          backgroundColor="$red3"
-          paddingHorizontal="$4"
+          paddingHorizontal="$2"
           paddingVertical="$2"
           alignItems="center"
-          justifyContent="center"
           gap="$2"
         >
-          <XStack
-            width={8}
-            height={8}
-            borderRadius={4}
-            backgroundColor="$errorColor"
+          <Button
+            size="$4"
+            circular
+            chromeless
+            onPress={onVoiceCancel}
+            icon={<Ionicons name="trash-outline" size={22} color={iconColor} />}
           />
-          <Text color="$red11" fontSize="$3">
-            Recording... Release to send
-          </Text>
+
+          <XStack
+            flex={1}
+            backgroundColor="$backgroundStrong"
+            borderRadius="$4"
+            height={44}
+            alignItems="center"
+            paddingHorizontal="$3"
+            gap="$2"
+          >
+            <XStack
+              width={8}
+              height={8}
+              borderRadius={4}
+              backgroundColor="$red10"
+            />
+
+            <XStack flex={1} height={30} alignItems="center" justifyContent="flex-end" gap={2} overflow="hidden">
+              {voiceMeteringLevels.map((level, i) => (
+                <YStack
+                  key={i}
+                  width={3}
+                  borderRadius={1.5}
+                  backgroundColor="$red10"
+                  height={Math.max(4, level * 26)}
+                />
+              ))}
+            </XStack>
+
+            <Text
+              fontSize="$3"
+              color="$colorSubtle"
+              fontFamily="$mono"
+              minWidth={40}
+              textAlign="right"
+            >
+              {formatTime(voiceDuration)}
+            </Text>
+          </XStack>
+
+          <Button
+            size="$4"
+            circular
+            backgroundColor="$red10"
+            pressStyle={{ backgroundColor: '$red11', scale: 0.95 }}
+            onPress={onVoiceToggle}
+            icon={<Ionicons name="stop" size={20} color="white" />}
+          />
+        </XStack>
+      ) : (
+        <XStack
+          paddingHorizontal="$2"
+          paddingVertical="$2"
+          alignItems="flex-end"
+          gap="$2"
+        >
+          <Button
+            size="$3"
+            circular
+            chromeless
+            onPress={onToggleAttachments}
+            icon={<Ionicons name={showAttachments ? 'close' : 'attach-outline'} size={24} color={iconColor} />}
+          />
+
+          <XStack
+            flex={1}
+            backgroundColor="$backgroundStrong"
+            borderRadius="$4"
+            minHeight={44}
+            maxHeight={120}
+            alignItems="center"
+          >
+            <TextInput
+              ref={inputRef}
+              style={{ flex: 1, fontSize: 16, color, paddingHorizontal: 12 }}
+              placeholder={pendingAttachment ? 'Add a caption...' : 'Type a note...'}
+              placeholderTextColor={placeholderColor}
+              value={text}
+              onChangeText={setText}
+              multiline
+              maxLength={5000}
+              returnKeyType="default"
+            />
+          </XStack>
+
+          {canSend ? (
+            <Button
+              size="$4"
+              circular
+              backgroundColor="$brandBackground"
+              pressStyle={{ backgroundColor: '$brandBackgroundHover', scale: 0.95 }}
+              onPress={handleSend}
+              icon={<Ionicons name="send" size={20} color={brandText} />}
+            />
+          ) : (
+            <Button
+              size="$4"
+              circular
+              backgroundColor="$brandBackground"
+              pressStyle={{ backgroundColor: '$brandBackgroundHover', scale: 0.95 }}
+              onPress={onVoiceToggle}
+              icon={<Ionicons name="mic" size={20} color={brandText} />}
+            />
+          )}
         </XStack>
       )}
     </YStack>
