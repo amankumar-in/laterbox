@@ -46,11 +46,11 @@ export function Header({ title, leftIcon, rightIcon }: HeaderProps) {
       </XStack>
 
       <XStack>
-        <Text fontSize="$7" fontWeight="700" color="$color" textTransform="lowercase">
-          mne
+        <Text fontSize="$7" fontWeight="700" color="$color">
+          Later
         </Text>
-        <Text fontSize="$7" fontWeight="700" color="$accentColor" textTransform="lowercase">
-          me
+        <Text fontSize="$7" fontWeight="700" color="$accentColor">
+          Box
         </Text>
       </XStack>
 
