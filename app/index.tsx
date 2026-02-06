@@ -7,6 +7,8 @@ import { ActivityIndicator, Alert, BackHandler, FlatList, RefreshControl } from 
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button, Separator, Text, XStack, YStack } from 'tamagui'
 
+import { MinimalHomeScreen } from '../components/MinimalHomeScreen'
+import { useMinimalMode } from '../contexts/MinimalModeContext'
 import { FAB } from '../components/FAB'
 import { FilterChips } from '../components/FilterChips'
 import { Header } from '../components/Header'
@@ -34,6 +36,16 @@ const FILTER_OPTIONS = [
 ]
 
 export default function HomeScreen() {
+  const { isMinimalMode, minimalThreadId } = useMinimalMode()
+
+  if (isMinimalMode && minimalThreadId) {
+    return <MinimalHomeScreen threadId={minimalThreadId} />
+  }
+
+  return <ThreadListHome />
+}
+
+function ThreadListHome() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { iconColor, iconColorStrong } = useThemeColor()

@@ -12,6 +12,8 @@ const NOTE_FONT_SCALE_KEY = '@laterbox:noteFontScale'
 const NOTE_VIEW_STYLE_KEY = '@laterbox:noteViewStyle'
 const APP_FONT_KEY = '@laterbox:appFont'
 const THREAD_VIEW_STYLE_KEY = '@laterbox:threadViewStyle'
+const MINIMAL_MODE_KEY = '@laterbox:minimalMode'
+const MINIMAL_MODE_THREAD_ID_KEY = '@laterbox:minimalModeThreadId'
 
 export type AppTheme = 'light' | 'dark' | 'system'
 
@@ -91,6 +93,27 @@ export async function setThreadViewStyle(style: ThreadViewStyle): Promise<void> 
   await AsyncStorage.setItem(THREAD_VIEW_STYLE_KEY, style)
 }
 
+export async function getMinimalMode(): Promise<boolean> {
+  const stored = await AsyncStorage.getItem(MINIMAL_MODE_KEY)
+  return stored === 'true'
+}
+
+export async function setMinimalMode(enabled: boolean): Promise<void> {
+  await AsyncStorage.setItem(MINIMAL_MODE_KEY, enabled ? 'true' : 'false')
+}
+
+export async function getMinimalModeThreadId(): Promise<string | null> {
+  return AsyncStorage.getItem(MINIMAL_MODE_THREAD_ID_KEY)
+}
+
+export async function setMinimalModeThreadId(id: string | null): Promise<void> {
+  if (id) {
+    await AsyncStorage.setItem(MINIMAL_MODE_THREAD_ID_KEY, id)
+  } else {
+    await AsyncStorage.removeItem(MINIMAL_MODE_THREAD_ID_KEY)
+  }
+}
+
 function generateId(): string {
   const timestamp = Date.now().toString(36)
   const randomPart = Math.random().toString(36).substring(2, 15)
@@ -140,7 +163,7 @@ export async function clearAuthToken(): Promise<void> {
 }
 
 export async function clearAll(): Promise<void> {
-  await AsyncStorage.multiRemove([DEVICE_ID_KEY, USER_KEY, AUTH_TOKEN_KEY, THEME_KEY, SYNC_ENABLED_KEY, NOTE_FONT_SCALE_KEY, NOTE_VIEW_STYLE_KEY, APP_FONT_KEY, THREAD_VIEW_STYLE_KEY])
+  await AsyncStorage.multiRemove([DEVICE_ID_KEY, USER_KEY, AUTH_TOKEN_KEY, THEME_KEY, SYNC_ENABLED_KEY, NOTE_FONT_SCALE_KEY, NOTE_VIEW_STYLE_KEY, APP_FONT_KEY, THREAD_VIEW_STYLE_KEY, MINIMAL_MODE_KEY, MINIMAL_MODE_THREAD_ID_KEY])
 }
 
 /**

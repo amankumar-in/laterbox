@@ -56,6 +56,7 @@ import { FontScaleProvider } from '@/contexts/FontScaleContext'
 import { FontFamilyProvider, useAppFont } from '@/contexts/FontFamilyContext'
 import { NoteViewProvider } from '@/contexts/NoteViewContext'
 import { ThreadViewProvider } from '@/contexts/ThreadViewContext'
+import { MinimalModeProvider } from '@/contexts/MinimalModeContext'
 import { useInitializeLocalUser } from '@/hooks/useUser'
 import { useAutoSync } from '@/hooks/useSyncService'
 import { useNotifications } from '@/hooks/useNotifications'
@@ -177,7 +178,9 @@ export default function RootLayout() {
                 <NoteViewProvider>
                   <ThreadViewProvider>
                     <DatabaseProvider>
-                      <ThemedRoot />
+                      <MinimalModeProvider>
+                        <ThemedRoot />
+                      </MinimalModeProvider>
                     </DatabaseProvider>
                   </ThreadViewProvider>
                 </NoteViewProvider>

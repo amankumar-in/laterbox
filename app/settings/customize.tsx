@@ -5,12 +5,14 @@ import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
+import { Leaf } from 'lucide-react-native'
 import { useThemeColor } from '../../hooks/useThemeColor'
 import { useAppTheme } from '../../contexts/ThemeContext'
 import { useNoteFontScale } from '../../contexts/FontScaleContext'
 import { useNoteViewStyle } from '../../contexts/NoteViewContext'
 import { useAppFont } from '../../contexts/FontFamilyContext'
 import { useThreadViewStyle } from '../../contexts/ThreadViewContext'
+import { useMinimalMode } from '../../contexts/MinimalModeContext'
 import { FONT_SCALE_STEPS, type FontScale, type NoteViewStyle, type AppFont, type ThreadViewStyle } from '../../services/storage'
 import { useUser, useUpdateUser } from '../../hooks/useUser'
 
@@ -563,6 +565,90 @@ function ThreadViewSelector() {
   )
 }
 
+function MinimalModeSelector() {
+  const { isMinimalMode, enableMinimalMode, disableMinimalMode } = useMinimalMode()
+  const { accentColor, iconColor, background } = useThemeColor()
+
+  const handleToggle = useCallback(async (enabled: boolean) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    if (enabled) {
+      await enableMinimalMode()
+    } else {
+      await disableMinimalMode()
+    }
+  }, [enableMinimalMode, disableMinimalMode])
+
+  return (
+    <XStack
+      paddingHorizontal="$4"
+      paddingVertical="$3"
+      gap="$3"
+      alignItems="center"
+    >
+      <XStack
+        width={36}
+        height={36}
+        borderRadius="$2"
+        backgroundColor="$backgroundStrong"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Leaf size={20} color={accentColor} />
+      </XStack>
+
+      <YStack flex={1} gap="$0.5">
+        <Text fontSize="$4" color="$color">
+          Minimal mode
+        </Text>
+        <Text fontSize="$2" color="$colorSubtle">
+          {isMinimalMode ? 'On' : 'Quick capture on home screen'}
+        </Text>
+      </YStack>
+
+      <XStack
+        backgroundColor="$backgroundStrong"
+        borderRadius="$4"
+        borderWidth={1}
+        borderColor="$borderColor"
+        padding="$1"
+        gap="$1"
+      >
+        {[
+          { value: false, label: 'Off' },
+          { value: true, label: 'On' },
+        ].map((opt) => {
+          const selected = isMinimalMode === opt.value
+          return (
+            <Pressable
+              key={String(opt.value)}
+              onPress={() => {
+                if (isMinimalMode !== opt.value) handleToggle(opt.value)
+              }}
+              style={{
+                backgroundColor: selected ? accentColor : 'transparent',
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 6,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <Text
+                fontSize="$2"
+                fontWeight={selected ? '600' : '400'}
+                color={selected ? background : '$colorSubtle'}
+              >
+                {opt.label}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </XStack>
+    </XStack>
+  )
+}
+
 type ThemeOption = 'system' | 'dark' | 'light'
 
 const OPTIONS: { value: ThemeOption; label: string; variant: 'auto' | 'dark' | 'light' }[] = [
@@ -676,6 +762,10 @@ export default function CustomizeScreen() {
         <Separator />
 
         <ThreadViewSelector />
+
+        <Separator />
+
+        <MinimalModeSelector />
       </ScrollView>
     </YStack>
   )
