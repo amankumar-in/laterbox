@@ -140,7 +140,7 @@ export const SCHEMA_V1 = `
 
   -- Create Protected Notes system thread
   INSERT OR IGNORE INTO threads (id, name, icon, is_pinned, is_system_thread, sync_status, created_at, updated_at)
-  VALUES ('system-protected-notes', 'Protected Notes', '🔒', 0, 1, 'pending', datetime('now'), datetime('now'));
+  VALUES ('system-protected-notes', 'Protected Notes', '🔒', 0, 1, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
 `
 
 // Migrations for future versions
@@ -149,7 +149,7 @@ export const MIGRATIONS: Record<number, string> = {
     ALTER TABLE threads ADD COLUMN is_system_thread INTEGER NOT NULL DEFAULT 0;
 
     INSERT OR IGNORE INTO threads (id, name, icon, is_pinned, is_system_thread, sync_status, created_at, updated_at)
-    VALUES ('system-protected-notes', 'Protected Notes', '🔒', 0, 1, 'pending', datetime('now'), datetime('now'));
+    VALUES ('system-protected-notes', 'Protected Notes', '🔒', 0, 1, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
   `,
   3: `
     ALTER TABLE notes ADD COLUMN notification_id TEXT;

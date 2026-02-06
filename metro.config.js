@@ -5,6 +5,15 @@ const config = getDefaultConfig(__dirname, {
   isCSSEnabled: true,
 })
 
-config.resolver.sourceExts.push('mjs')
+const { transformer, resolver } = config
+config.transformer = {
+  ...transformer,
+  babelTransformerPath: require.resolve('react-native-svg-transformer/expo'),
+}
+config.resolver = {
+  ...resolver,
+  assetExts: resolver.assetExts.filter((ext) => ext !== 'svg'),
+  sourceExts: [...resolver.sourceExts, 'svg', 'mjs'],
+}
 
 module.exports = config

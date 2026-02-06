@@ -181,7 +181,7 @@ export default function ProfileScreen() {
       try {
         const res = await checkUsernameApi(usernameValue)
         setUsernameAvailable(res.available)
-        setUsernameError(res.available ? '' : 'Username taken')
+        setUsernameError('')
       } catch {
         setUsernameError('Check failed')
         setUsernameAvailable(false)
@@ -557,7 +557,7 @@ export default function ProfileScreen() {
                   placeholderTextColor={placeholderColor}
                 />
                 <Pressable onPress={cancelEdit} hitSlop={8}>
-                  <Text fontSize="$3" color="$colorSubtle">Cancel</Text>
+                  <Text fontSize="$3" color="$colorSubtle" fontWeight="600">Cancel</Text>
                 </Pressable>
                 <Pressable onPress={saveName} disabled={!nameValue.trim() || savingName} hitSlop={8}>
                   {savingName ? <Spinner size="small" /> : <Text fontSize="$3" color="$accentColor" fontWeight="600">Save</Text>}
@@ -567,7 +567,7 @@ export default function ProfileScreen() {
               <XStack flex={1} alignItems="center" justifyContent="space-between">
                 <Text fontSize="$4" color={user?.name ? '$color' : '$colorSubtle'}>{user?.name || 'Not set'}</Text>
                 <Pressable onPress={startEditName} hitSlop={8}>
-                  <Text fontSize="$3" color="$accentColor">Edit</Text>
+                  <Text fontSize="$3" color="$accentColor" fontWeight="600">Edit</Text>
                 </Pressable>
               </XStack>
             )}
@@ -603,10 +603,10 @@ export default function ProfileScreen() {
                     <Text fontSize="$2" color="$green10">Available</Text>
                   )}
                   {!checkingUsername && usernameAvailable === false && !usernameError && (
-                    <Text fontSize="$2" color="$orange10">Login</Text>
+                    <Text fontSize="$2" color="$orange10">Account exists</Text>
                   )}
                   <Pressable onPress={cancelEdit} hitSlop={8}>
-                    <Text fontSize="$3" color="$colorSubtle">Cancel</Text>
+                    <Text fontSize="$3" color="$colorSubtle" fontWeight="600">Cancel</Text>
                   </Pressable>
                 </XStack>
               </XStack>
@@ -646,6 +646,11 @@ export default function ProfileScreen() {
                   </XStack>
                 </XStack>
               )}
+              {passwordValue.length > 0 && passwordValue.length < 8 && (
+                <Text fontSize="$2" color="$orange10" paddingHorizontal="$4" paddingBottom="$2">
+                  {8 - passwordValue.length} more character{8 - passwordValue.length !== 1 ? 's' : ''} needed
+                </Text>
+              )}
             </YStack>
           ) : (
             // Not editing - show "Add" button
@@ -654,7 +659,7 @@ export default function ProfileScreen() {
               <XStack flex={1} alignItems="center" justifyContent="space-between">
                 <Text fontSize="$4" color="$colorSubtle">Not set</Text>
                 <Pressable onPress={startEditUsername} hitSlop={8}>
-                  <Text fontSize="$3" color="$accentColor">Add</Text>
+                  <Text fontSize="$3" color="$accentColor" fontWeight="600">Add</Text>
                 </Pressable>
               </XStack>
             </FieldRow>
@@ -668,7 +673,7 @@ export default function ProfileScreen() {
                 <Ionicons name="checkmark-circle" size={16} color={successColor} />
                 <Text flex={1} fontSize="$4" color="$color">{user.email}</Text>
                 <Pressable onPress={startEditEmail} hitSlop={8}>
-                  <Text fontSize="$3" color="$accentColor">Change</Text>
+                  <Text fontSize="$3" color="$accentColor" fontWeight="600">Change</Text>
                 </Pressable>
               </XStack>
             </FieldRow>
@@ -689,7 +694,7 @@ export default function ProfileScreen() {
                       autoCapitalize="none"
                     />
                     <Pressable onPress={cancelEdit} hitSlop={8}>
-                      <Text fontSize="$3" color="$colorSubtle">Cancel</Text>
+                      <Text fontSize="$3" color="$colorSubtle" fontWeight="600">Cancel</Text>
                     </Pressable>
                     <Pressable onPress={sendEmailCode} disabled={!emailValue || savingEmail} hitSlop={8}>
                       {savingEmail ? <Spinner size="small" /> : <Text fontSize="$3" color="$accentColor" fontWeight="600">Verify</Text>}
@@ -708,7 +713,7 @@ export default function ProfileScreen() {
                       maxLength={6}
                     />
                     <Pressable onPress={cancelEdit} hitSlop={8}>
-                      <Text fontSize="$3" color="$colorSubtle">Cancel</Text>
+                      <Text fontSize="$3" color="$colorSubtle" fontWeight="600">Cancel</Text>
                     </Pressable>
                     <Pressable onPress={verifyEmail} disabled={emailCode.length !== 6 || savingEmail} hitSlop={8}>
                       {savingEmail ? <Spinner size="small" /> : <Text fontSize="$3" color="$accentColor" fontWeight="600">Confirm</Text>}
@@ -726,7 +731,7 @@ export default function ProfileScreen() {
               <XStack flex={1} alignItems="center" justifyContent="space-between">
                 <Text fontSize="$4" color="$colorSubtle">Not set</Text>
                 <Pressable onPress={startEditEmail} hitSlop={8}>
-                  <Text fontSize="$3" color="$accentColor">Add</Text>
+                  <Text fontSize="$3" color="$accentColor" fontWeight="600">Add</Text>
                 </Pressable>
               </XStack>
             </FieldRow>
@@ -740,7 +745,7 @@ export default function ProfileScreen() {
                 <Ionicons name="checkmark-circle" size={16} color={successColor} />
                 <Text flex={1} fontSize="$4" color="$color">{user.phone}</Text>
                 <Pressable onPress={startEditPhone} hitSlop={8}>
-                  <Text fontSize="$3" color="$accentColor">Change</Text>
+                  <Text fontSize="$3" color="$accentColor" fontWeight="600">Change</Text>
                 </Pressable>
               </XStack>
             </FieldRow>
@@ -767,7 +772,7 @@ export default function ProfileScreen() {
                       keyboardType="phone-pad"
                     />
                     <Pressable onPress={cancelEdit} hitSlop={8}>
-                      <Text fontSize="$3" color="$colorSubtle">Cancel</Text>
+                      <Text fontSize="$3" color="$colorSubtle" fontWeight="600">Cancel</Text>
                     </Pressable>
                     <Pressable onPress={sendPhoneCode} disabled={!phoneValue || savingPhone} hitSlop={8}>
                       {savingPhone ? <Spinner size="small" /> : <Text fontSize="$3" color="$accentColor" fontWeight="600">Verify</Text>}
@@ -786,7 +791,7 @@ export default function ProfileScreen() {
                       maxLength={6}
                     />
                     <Pressable onPress={cancelEdit} hitSlop={8}>
-                      <Text fontSize="$3" color="$colorSubtle">Cancel</Text>
+                      <Text fontSize="$3" color="$colorSubtle" fontWeight="600">Cancel</Text>
                     </Pressable>
                     <Pressable onPress={verifyPhone} disabled={phoneCode.length !== 6 || savingPhone} hitSlop={8}>
                       {savingPhone ? <Spinner size="small" /> : <Text fontSize="$3" color="$accentColor" fontWeight="600">Confirm</Text>}
@@ -804,7 +809,7 @@ export default function ProfileScreen() {
               <XStack flex={1} alignItems="center" justifyContent="space-between">
                 <Text fontSize="$4" color="$colorSubtle">Not set</Text>
                 <Pressable onPress={startEditPhone} hitSlop={8}>
-                  <Text fontSize="$3" color="$accentColor">Add</Text>
+                  <Text fontSize="$3" color="$accentColor" fontWeight="600">Add</Text>
                 </Pressable>
               </XStack>
             </FieldRow>
@@ -852,7 +857,7 @@ export default function ProfileScreen() {
                       secureTextEntry
                     />
                     <Pressable onPress={cancelEdit} hitSlop={8}>
-                      <Text fontSize="$3" color="$colorSubtle">Cancel</Text>
+                      <Text fontSize="$3" color="$colorSubtle" fontWeight="600">Cancel</Text>
                     </Pressable>
                     <Pressable
                       onPress={savePassword}
@@ -875,7 +880,7 @@ export default function ProfileScreen() {
                     {hasPassword ? '••••••••' : 'Not set'}
                   </Text>
                   <Pressable onPress={startEditPassword} hitSlop={8}>
-                    <Text fontSize="$3" color="$accentColor">{hasPassword ? 'Change' : 'Set'}</Text>
+                    <Text fontSize="$3" color="$accentColor" fontWeight="600">{hasPassword ? 'Change' : 'Set'}</Text>
                   </Pressable>
                 </XStack>
               </FieldRow>
@@ -884,9 +889,9 @@ export default function ProfileScreen() {
 
           {/* Info note */}
           <YStack padding="$4">
-            <XStack backgroundColor="$blue2" padding="$3" borderRadius="$3" gap="$2" alignItems="flex-start">
+            <XStack backgroundColor="$backgroundTinted" padding="$3" borderRadius="$3" gap="$2" alignItems="flex-start">
               <Ionicons name="information-circle-outline" size={18} color={accentColor} />
-              <Text fontSize="$2" color="$blue10" flex={1}>
+              <Text fontSize="$2" color="$accentColor" flex={1}>
                 Set any identifier (username, email, or phone) to enable cloud sync and backup.
               </Text>
             </XStack>

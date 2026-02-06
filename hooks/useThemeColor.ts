@@ -16,6 +16,9 @@ export function useThemeColor() {
     // Brand
     brandText: theme.brandText?.get() as string,
     brandBackground: theme.brandBackground?.get() as string,
+    brandBackgroundHover: theme.brandBackgroundHover?.get() as string,
+    // Paper
+    paperText: theme.paperText?.get() as string,
     // Icons
     iconColor: theme.iconColor?.get() as string,
     iconColorStrong: theme.iconColorStrong?.get() as string,

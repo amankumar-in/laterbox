@@ -3,6 +3,7 @@ import { useDb } from '@/contexts/DatabaseContext'
 import { getUserRepository } from '@/services/repositories'
 import { getDeviceId, clearAll, getAuthToken, clearAuthToken } from '@/services/storage'
 import { deleteAccount as deleteAccountApi, resetApiInstance, logout as logoutApi } from '@/services/api'
+import { getTimestamp } from '@/services/database'
 import { resetSyncService } from '@/services/sync/sync.service'
 import type { UserProfile } from '@/services/database/types'
 
@@ -118,33 +119,32 @@ export function useLogout() {
 /**
  * Delete account - clears everything (local + remote if authenticated)
  */
-export function useDeleteAccount() {
+export function useDeleteServerAccount() {
+  return useMutation({
+    mutationFn: async () => {
+      await deleteAccountApi()
+    },
+  })
+}
+
+export function useDeleteLocalData() {
   const db = useDb()
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async () => {
-      // Try to delete from server if authenticated
-      const token = await getAuthToken()
-      if (token) {
-        try {
-          await deleteAccountApi()
-        } catch (error: any) {
-          // If server fails, still proceed with local deletion
-          console.warn('[DeleteAccount] Server deletion failed:', error.message)
-        }
-      }
-
-      // Delete ALL local SQLite data
       await db.runAsync('DELETE FROM notes')
       await db.runAsync('DELETE FROM threads')
       await db.runAsync('DELETE FROM user')
+      // Recreate the system thread that was just deleted
+      const now = getTimestamp()
+      await db.runAsync(
+        `INSERT OR IGNORE INTO threads (id, name, icon, is_pinned, is_system_thread, sync_status, created_at, updated_at)
+         VALUES ('system-protected-notes', 'Protected Notes', '🔒', 0, 1, 'pending', ?, ?)`,
+        [now, now]
+      )
       await db.runAsync('UPDATE sync_meta SET last_sync_timestamp = NULL, is_syncing = 0')
-
-      // Clear AsyncStorage (device ID, cached user, auth token)
       await clearAll()
-
-      // Reset cached API instances
       resetApiInstance()
       resetSyncService()
     },

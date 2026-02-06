@@ -15,9 +15,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Button, Separator, Text, XStack, YStack } from 'tamagui'
 import { useSyncService } from '../../hooks/useSyncService'
 import { useThemeColor } from '../../hooks/useThemeColor'
-import { useDeleteAccount, useUpdateUser, useUser } from '../../hooks/useUser'
+import { useDeleteServerAccount, useDeleteLocalData, useUpdateUser, useUser } from '../../hooks/useUser'
 import { deleteAccountInfo, deleteRemoteData, logout } from '../../services/api'
-import { clearAll, getSyncEnabled, setSyncEnabled } from '../../services/storage'
+import { clearAll, getAuthToken, getSyncEnabled, setSyncEnabled } from '../../services/storage'
 
 function getInitials(name: string): string {
   const words = name.trim().split(/\s+/)
@@ -302,7 +302,23 @@ export default function SettingsScreen() {
     )
   }, [])
 
-  const deleteAccount = useDeleteAccount()
+  const deleteServer = useDeleteServerAccount()
+  const deleteLocal = useDeleteLocalData()
+
+  const performLocalDeletion = useCallback(async () => {
+    await deleteLocal.mutateAsync()
+
+    const mediaDir = new Directory(Paths.document, 'media')
+    const cacheMediaDir = new Directory(Paths.cache, 'media')
+    if (mediaDir.exists) mediaDir.delete()
+    if (cacheMediaDir.exists) cacheMediaDir.delete()
+
+    Alert.alert(
+      'Everything Deleted',
+      'All your data has been deleted. The app will restart.',
+      [{ text: 'OK', onPress: () => router.replace('/') }]
+    )
+  }, [deleteLocal, router])
 
   const handleDeleteEverything = useCallback(() => {
     Alert.alert(
@@ -314,38 +330,57 @@ export default function SettingsScreen() {
           text: 'Delete Everything',
           style: 'destructive',
           onPress: async () => {
+            const token = await getAuthToken()
+
+            if (!token) {
+              try {
+                await performLocalDeletion()
+              } catch (error: any) {
+                Alert.alert('Error', error.message || 'Failed to delete local data')
+              }
+              return
+            }
+
+            // Authenticated — try server deletion first
             try {
-              // Delete from server first (if authenticated)
-              await deleteAccount.mutateAsync()
-
-              // Clear local storage
-              await clearAll()
-
-              // Delete local media
-              const mediaDir = new Directory(Paths.document, 'media')
-              const cacheMediaDir = new Directory(Paths.cache, 'media')
-
-              if (mediaDir.exists) {
-                mediaDir.delete()
+              await deleteServer.mutateAsync()
+            } catch (serverError: any) {
+              // AUTH_CLEARED means server account is already gone — treat as success
+              if (serverError.message !== 'AUTH_CLEARED') {
+                Alert.alert(
+                  'Server Deletion Failed',
+                  'Could not delete your account from the server. Your server data (including username) will remain if you continue.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Retry', onPress: () => handleDeleteEverything() },
+                    {
+                      text: 'Delete Local Only',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          await performLocalDeletion()
+                        } catch (error: any) {
+                          Alert.alert('Error', error.message || 'Failed to delete local data')
+                        }
+                      },
+                    },
+                  ]
+                )
+                return
               }
+            }
 
-              if (cacheMediaDir.exists) {
-                cacheMediaDir.delete()
-              }
-
-              Alert.alert(
-                'Everything Deleted',
-                'All your data has been deleted. The app will restart.',
-                [{ text: 'OK', onPress: () => router.replace('/') }]
-              )
+            // Server deletion succeeded — now delete local
+            try {
+              await performLocalDeletion()
             } catch (error: any) {
-              Alert.alert('Error', error.response?.data?.error || error.message || 'Failed to delete everything')
+              Alert.alert('Error', error.message || 'Failed to delete local data')
             }
           },
         },
       ]
     )
-  }, [deleteAccount, router])
+  }, [deleteServer, performLocalDeletion])
 
   return (
     <YStack flex={1} backgroundColor="$background">

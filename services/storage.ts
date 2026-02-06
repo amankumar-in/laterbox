@@ -8,6 +8,10 @@ const USER_KEY = '@laterbox:user'
 const AUTH_TOKEN_KEY = '@laterbox:authToken'
 const THEME_KEY = '@laterbox:appTheme'
 const SYNC_ENABLED_KEY = '@laterbox:syncEnabled'
+const NOTE_FONT_SCALE_KEY = '@laterbox:noteFontScale'
+const NOTE_VIEW_STYLE_KEY = '@laterbox:noteViewStyle'
+const APP_FONT_KEY = '@laterbox:appFont'
+const THREAD_VIEW_STYLE_KEY = '@laterbox:threadViewStyle'
 
 export type AppTheme = 'light' | 'dark' | 'system'
 
@@ -30,6 +34,61 @@ export async function getSyncEnabled(): Promise<boolean> {
 
 export async function setSyncEnabled(enabled: boolean): Promise<void> {
   await AsyncStorage.setItem(SYNC_ENABLED_KEY, enabled ? 'true' : 'false')
+}
+
+export const FONT_SCALE_STEPS = [0.85, 0.92, 1.0, 1.15, 1.3] as const
+export type FontScale = (typeof FONT_SCALE_STEPS)[number]
+const DEFAULT_FONT_SCALE: FontScale = 1.0
+
+export async function getNoteFontScale(): Promise<FontScale> {
+  const stored = await AsyncStorage.getItem(NOTE_FONT_SCALE_KEY)
+  if (stored) {
+    const parsed = parseFloat(stored)
+    if (FONT_SCALE_STEPS.includes(parsed as FontScale)) return parsed as FontScale
+  }
+  return DEFAULT_FONT_SCALE
+}
+
+export async function setNoteFontScale(scale: FontScale): Promise<void> {
+  await AsyncStorage.setItem(NOTE_FONT_SCALE_KEY, String(scale))
+}
+
+export type NoteViewStyle = 'bubble' | 'paper'
+
+export async function getNoteViewStyle(): Promise<NoteViewStyle> {
+  const stored = await AsyncStorage.getItem(NOTE_VIEW_STYLE_KEY)
+  if (stored === 'bubble' || stored === 'paper') return stored
+  return 'bubble'
+}
+
+export async function setNoteViewStyle(style: NoteViewStyle): Promise<void> {
+  await AsyncStorage.setItem(NOTE_VIEW_STYLE_KEY, style)
+}
+
+export type AppFont = 'inter' | 'poppins' | 'lora' | 'nunito' | 'jetbrains-mono'
+
+const VALID_FONTS: AppFont[] = ['inter', 'poppins', 'lora', 'nunito', 'jetbrains-mono']
+
+export async function getAppFont(): Promise<AppFont> {
+  const stored = await AsyncStorage.getItem(APP_FONT_KEY)
+  if (stored && VALID_FONTS.includes(stored as AppFont)) return stored as AppFont
+  return 'inter'
+}
+
+export async function setAppFont(font: AppFont): Promise<void> {
+  await AsyncStorage.setItem(APP_FONT_KEY, font)
+}
+
+export type ThreadViewStyle = 'list' | 'icons'
+
+export async function getThreadViewStyle(): Promise<ThreadViewStyle> {
+  const stored = await AsyncStorage.getItem(THREAD_VIEW_STYLE_KEY)
+  if (stored === 'list' || stored === 'icons') return stored
+  return 'list'
+}
+
+export async function setThreadViewStyle(style: ThreadViewStyle): Promise<void> {
+  await AsyncStorage.setItem(THREAD_VIEW_STYLE_KEY, style)
 }
 
 function generateId(): string {
@@ -81,7 +140,7 @@ export async function clearAuthToken(): Promise<void> {
 }
 
 export async function clearAll(): Promise<void> {
-  await AsyncStorage.multiRemove([DEVICE_ID_KEY, USER_KEY, AUTH_TOKEN_KEY, THEME_KEY, SYNC_ENABLED_KEY])
+  await AsyncStorage.multiRemove([DEVICE_ID_KEY, USER_KEY, AUTH_TOKEN_KEY, THEME_KEY, SYNC_ENABLED_KEY, NOTE_FONT_SCALE_KEY, NOTE_VIEW_STYLE_KEY, APP_FONT_KEY, THREAD_VIEW_STYLE_KEY])
 }
 
 /**

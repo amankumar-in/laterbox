@@ -12,6 +12,7 @@ import { FilterChips } from '../components/FilterChips'
 import { Header } from '../components/Header'
 import { SearchBar } from '../components/SearchBar'
 import { ThreadActionBar } from '../components/thread/ThreadActionBar'
+import { ThreadGridItem } from '../components/ThreadGridItem'
 import { ThreadListItem } from '../components/ThreadListItem'
 import { useExportThread } from '../hooks/useExportThread'
 import { useShortcuts } from '../hooks/useShortcuts'
@@ -24,6 +25,7 @@ import {
     useUpdateThread,
 } from '../hooks/useThreads'
 import { useUser } from '../hooks/useUser'
+import { useThreadViewStyle } from '../contexts/ThreadViewContext'
 import type { ThreadFilter, ThreadWithLastNote } from '../types'
 
 const FILTER_OPTIONS = [
@@ -35,6 +37,7 @@ export default function HomeScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { iconColor, iconColorStrong } = useThemeColor()
+  const { threadViewStyle } = useThreadViewStyle()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedFilter, setSelectedFilter] = useState<ThreadFilter>('threads')
   const [selectedThreadIds, setSelectedThreadIds] = useState<Set<string>>(new Set())
@@ -340,26 +343,51 @@ export default function HomeScreen() {
           }}
         />
 
-        <FlatList
-          data={threads}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ThreadListItem
-              thread={item}
-              onPress={() => handleThreadPress(item)}
-              onLongPress={() => handleThreadLongPress(item)}
-              isSelected={selectedThreadIds.has(item.id)}
-            />
-          )}
-          ItemSeparatorComponent={() => <Separator marginLeft={76} />}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
-          refreshControl={
-            <RefreshControl
-              refreshing={isLoading || isRefreshing}
-              onRefresh={handleRefresh}
-            />
-          }
-        />
+        {threadViewStyle === 'icons' ? (
+          <FlatList
+            key="grid"
+            data={threads}
+            keyExtractor={(item) => item.id}
+            numColumns={3}
+            renderItem={({ item }) => (
+              <ThreadGridItem
+                thread={item}
+                onPress={() => handleThreadPress(item)}
+                onLongPress={() => handleThreadLongPress(item)}
+                isSelected={selectedThreadIds.has(item.id)}
+              />
+            )}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={isLoading || isRefreshing}
+                onRefresh={handleRefresh}
+              />
+            }
+          />
+        ) : (
+          <FlatList
+            key="list"
+            data={threads}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <ThreadListItem
+                thread={item}
+                onPress={() => handleThreadPress(item)}
+                onLongPress={() => handleThreadLongPress(item)}
+                isSelected={selectedThreadIds.has(item.id)}
+              />
+            )}
+            ItemSeparatorComponent={() => <Separator marginLeft={76} />}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={isLoading || isRefreshing}
+                onRefresh={handleRefresh}
+              />
+            }
+          />
+        )}
 
         {isSelectionMode ? (
           <ThreadActionBar
@@ -405,10 +433,6 @@ export default function HomeScreen() {
     <YStack flex={1} backgroundColor="$background">
       <Header
         title="LaterBox"
-        leftIcon={{
-          icon: <ScanLine size={24} color={iconColorStrong} />,
-          onPress: handleQRPress,
-        }}
         rightIcon={{ name: 'settings-outline', onPress: handleSettingsPress }}
       />
 

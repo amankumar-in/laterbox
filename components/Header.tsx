@@ -2,6 +2,9 @@ import { XStack, Text, Button } from 'tamagui'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { useThemeColor } from '../hooks/useThemeColor'
+import { useAppTheme } from '@/contexts/ThemeContext'
+import LogoIconLight from '@/assets/images/logo-icon-light-mode.svg'
+import LogoIconDark from '@/assets/images/logo-icon-dark-mode.svg'
 
 interface HeaderProps {
   title: string
@@ -19,6 +22,8 @@ interface HeaderProps {
 export function Header({ title, leftIcon, rightIcon }: HeaderProps) {
   const insets = useSafeAreaInsets()
   const { iconColorStrong } = useThemeColor()
+  const { resolvedTheme } = useAppTheme()
+  const LogoIcon = resolvedTheme === 'dark' ? LogoIconDark : LogoIconLight
 
   return (
     <XStack
@@ -29,7 +34,7 @@ export function Header({ title, leftIcon, rightIcon }: HeaderProps) {
       alignItems="center"
       justifyContent="space-between"
     >
-      <XStack width={44} justifyContent="flex-start">
+      <XStack flex={1} alignItems="center" gap="$2">
         {leftIcon && (
           <Button
             size="$3"
@@ -43,15 +48,17 @@ export function Header({ title, leftIcon, rightIcon }: HeaderProps) {
             }
           />
         )}
-      </XStack>
-
-      <XStack>
-        <Text fontSize="$7" fontWeight="700" color="$color">
-          Later
-        </Text>
-        <Text fontSize="$7" fontWeight="700" color="$accentColor">
-          Box
-        </Text>
+        <XStack alignItems="center" gap="$2">
+          <LogoIcon width={28} height={22} />
+          <XStack>
+            <Text fontSize="$7" fontWeight="700" color="$color">
+              Later
+            </Text>
+            <Text fontSize="$7" fontWeight="700" color="$accentColor">
+              Box
+            </Text>
+          </XStack>
+        </XStack>
       </XStack>
 
       <XStack width={44} justifyContent="flex-end">

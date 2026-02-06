@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
 import FileViewer from 'react-native-file-viewer'
 import { useThemeColor } from '../../hooks/useThemeColor'
+import { useNoteFontScale } from '../../contexts/FontScaleContext'
+import { useNoteViewStyle } from '../../contexts/NoteViewContext'
 import { resolveAttachmentUri, attachmentExists } from '../../services/fileStorage'
 import type { NoteWithDetails } from '../../types'
 
@@ -95,7 +97,12 @@ function MissingFile({ icon, label, iconColor }: { icon: string; label: string; 
 const MAX_LINES = 30
 
 export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageView, onVideoView, onAudioToggle, playingNoteId, isAudioPlaying, audioPositionMs = 0, audioDurationMs = 0, isHighlighted = false, isSelected = false }: NoteBubbleProps) {
-  const { brandText, iconColor, accentColor, background } = useThemeColor()
+  const { brandText, paperText, iconColor, accentColor, background } = useThemeColor()
+  const { fontScale } = useNoteFontScale()
+  const { noteViewStyle } = useNoteViewStyle()
+  const isPaper = noteViewStyle === 'paper'
+  const scaledFontSize = Math.round(14 * fontScale)
+  const contentColor = isPaper ? paperText : brandText
   const [isExpanded, setIsExpanded] = useState(false)
 
   const handleLongPress = () => {
@@ -151,7 +158,7 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
               </XStack>
             )}
             {note.content && (
-              <Text fontSize="$4" marginTop="$2" color={brandText}>
+              <Text fontSize={scaledFontSize} marginTop="$2" color={contentColor}>
                 {note.content}
               </Text>
             )}
@@ -228,7 +235,7 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
               </Pressable>
             )}
             {note.content && (
-              <Text fontSize="$4" marginTop="$2" color={brandText}>
+              <Text fontSize={scaledFontSize} marginTop="$2" color={contentColor}>
                 {note.content}
               </Text>
             )}
@@ -243,7 +250,7 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
             <YStack>
               <MissingFile icon="mic-outline" label="Voice note unavailable" iconColor={iconColor} />
               {note.content && (
-                <Text fontSize="$4" marginTop="$2" color={brandText}>
+                <Text fontSize={scaledFontSize} marginTop="$2" color={contentColor}>
                   {note.content}
                 </Text>
               )}
@@ -286,18 +293,18 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
                         width={3}
                         borderRadius={1.5}
                         height={Math.max(4, level * 24)}
-                        backgroundColor={i < playedBars ? '$color' : '$blue8'}
+                        backgroundColor={i < playedBars ? '$color' : '$accentColorMuted'}
                       />
                     ))}
                   </XStack>
-                  <Text fontSize="$2" color="$blue12">
+                  <Text fontSize="$2" color="$colorSubtle">
                     {displayTime}
                   </Text>
                 </YStack>
               </XStack>
             </Pressable>
             {note.content && (
-              <Text fontSize="$4" marginTop="$2" color={brandText}>
+              <Text fontSize={scaledFontSize} marginTop="$2" color={contentColor}>
                 {note.content}
               </Text>
             )}
@@ -323,17 +330,17 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
                 width={40}
                 height={40}
                 borderRadius="$2"
-                backgroundColor="$blue8"
+                backgroundColor="$accentColorMuted"
                 alignItems="center"
                 justifyContent="center"
               >
-                <Ionicons name="document" size={24} color={brandText} />
+                <Ionicons name="document" size={24} color={contentColor} />
               </XStack>
               <YStack flex={1}>
-                <Text fontSize="$3" fontWeight="500" numberOfLines={1} color={brandText}>
+                <Text fontSize="$3" fontWeight="500" numberOfLines={1} color={contentColor}>
                   {note.attachment?.filename || 'File'}
                 </Text>
-                <Text fontSize="$2" color="$blue12">
+                <Text fontSize="$2" color="$colorSubtle">
                   {note.attachment?.size ? formatFileSize(note.attachment.size) : ''}
                 </Text>
               </YStack>
@@ -380,12 +387,12 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
               >
                 <Ionicons name="person" size={22} color={iconColor} />
               </XStack>
-              <Text fontSize="$4" fontWeight="600" color={brandText}>
+              <Text fontSize={scaledFontSize} fontWeight="600" color={contentColor}>
                 {note.attachment?.filename || 'Contact'}
               </Text>
             </XStack>
             {note.content && (
-              <Text fontSize="$3" color="$blue12" numberOfLines={4}>
+              <Text fontSize="$3" color="$colorSubtle" numberOfLines={4}>
                 {note.content}
               </Text>
             )}
@@ -422,10 +429,10 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
                 <Ionicons name={isThisPlaying ? 'pause' : 'musical-notes'} size={20} color={iconColor} />
               </XStack>
               <YStack flex={1}>
-                <Text fontSize="$3" fontWeight="500" numberOfLines={1} color={brandText}>
+                <Text fontSize="$3" fontWeight="500" numberOfLines={1} color={contentColor}>
                   {note.attachment?.filename || 'Audio'}
                 </Text>
-                <Text fontSize="$2" color="$blue12">
+                <Text fontSize="$2" color="$colorSubtle">
                   {note.attachment?.size ? formatFileSize(note.attachment.size) : ''}
                 </Text>
               </YStack>
@@ -440,12 +447,12 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
           : note.content
         return (
           <YStack>
-            <Text fontSize="$4" color={brandText}>
+            <Text fontSize={scaledFontSize} color={contentColor}>
               {displayContent}
             </Text>
             {needsTruncation && (
               <Pressable onPress={toggleExpand}>
-                <Text fontSize="$3" color="$blue11" marginTop="$1" fontWeight="600">
+                <Text fontSize="$3" color="$accentColor" marginTop="$1" fontWeight="600">
                   {isExpanded ? 'Show less' : 'View more...'}
                 </Text>
               </Pressable>
@@ -459,28 +466,38 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
   return (
     <Pressable onLongPress={handleLongPress} onPress={handlePress}>
       <XStack
-        justifyContent="flex-end"
+        justifyContent={isPaper ? 'flex-start' : 'flex-end'}
         alignItems="flex-start"
-        paddingHorizontal="$4"
-        marginVertical="$1"
+        paddingHorizontal={isPaper ? 0 : '$4'}
+        marginVertical={isPaper ? 0 : '$1'}
         backgroundColor={showHighlight ? '$yellow4' : 'transparent'}
         paddingVertical={showHighlight ? '$1' : 0}
         position="relative"
       >
         <YStack
-          backgroundColor={showHighlight ? '$yellow8' : '$brandBackground'}
-          paddingHorizontal="$3"
+          backgroundColor={
+            showHighlight
+              ? '$yellow8'
+              : isPaper
+                ? '$paperBackground'
+                : '$brandBackground'
+          }
+          paddingHorizontal={isPaper ? '$4' : '$3'}
           paddingTop="$2"
           paddingBottom="$1"
-          borderRadius="$4"
-          borderBottomRightRadius="$1"
-          maxWidth="80%"
+          borderRadius={isPaper ? 0 : '$4'}
+          borderBottomRightRadius={isPaper ? 0 : '$1'}
+          maxWidth={isPaper ? '100%' : '80%'}
+          width={isPaper ? '100%' : undefined}
           position="relative"
-          borderWidth={note.isStarred ? 1 : 0}
+          borderWidth={isPaper ? 0 : note.isStarred ? 1 : 0}
           borderColor="#F59E0B"
+          borderBottomWidth={note.isStarred && !isPaper ? 1 : 0}
+          borderBottomColor="#F59E0B"
+          marginBottom={isPaper ? 10 : 0}
         >
           {note.isStarred && (
-            <XStack position="absolute" left={-24} top={8}>
+            <XStack position="absolute" left={isPaper ? 4 : -24} top={8}>
               <Ionicons name="star" size={16} color="#F59E0B" />
             </XStack>
           )}
@@ -492,7 +509,7 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
               <Ionicons
                 name={note.task.isCompleted ? 'checkbox' : 'square-outline'}
                 size={20}
-                color={brandText}
+                color={contentColor}
               />
             </Pressable>
           )}
@@ -503,14 +520,14 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
 
           <XStack justifyContent="flex-end" alignItems="center" gap="$1" marginTop="$1">
             {note.isLocked && (
-              <Ionicons name="lock-closed" size={12} color={brandText} />
+              <Ionicons name="lock-closed" size={12} color={contentColor} />
             )}
             {note.isEdited && (
-              <Text fontSize={10} color="$blue12" marginRight="$1">
+              <Text fontSize={10} color="$colorSubtle" marginRight="$1">
                 edited
               </Text>
             )}
-            <Text fontSize={10} color="$blue12">
+            <Text fontSize={10} color="$colorSubtle">
               {formatTime(note.createdAt)}
             </Text>
           </XStack>
@@ -522,10 +539,10 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
               marginTop="$1"
               paddingTop="$1"
               borderTopWidth={1}
-              borderTopColor="$blue8"
+              borderTopColor="$accentColorMuted"
             >
-              <Ionicons name="alarm" size={12} color={brandText} />
-              <Text fontSize={10} color="$blue12">
+              <Ionicons name="alarm" size={12} color={contentColor} />
+              <Text fontSize={10} color="$colorSubtle">
                 {new Date(note.task.reminderAt).toLocaleDateString(undefined, {
                   month: 'short',
                   day: 'numeric',
