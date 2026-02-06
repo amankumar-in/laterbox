@@ -40,6 +40,12 @@ server/.env
 
 app-example
 
+# build artifacts
+*.apk
+*.aab
+build-*.apk
+build-*.aab
+
 # generated native folders
 /ios
 /android
@@ -47,3 +53,5 @@ app-example
 # server user-data (persistent disk)
 server/user-data/
 store-listing.txt
+assets/images/xcore-apps-b6907986942e.json
+xcore-apps-b6907986942e.json

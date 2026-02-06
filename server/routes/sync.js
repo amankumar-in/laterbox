@@ -155,7 +155,6 @@ router.post('/push', authenticate, asyncHandler(async (req, res) => {
 
     const updatePayload = {
       name: data.name,
-      avatar: data.avatar,
       settings: data.settings,
     };
 

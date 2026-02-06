@@ -442,7 +442,6 @@ export class SyncService {
       username: user.username,
       email: user.email,
       phone: user.phone,
-      avatar: user.avatar,
       settings: {
         theme: user.settings_theme,
         notifications: {
