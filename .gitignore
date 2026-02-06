@@ -46,3 +46,4 @@ app-example
 
 # server user-data (persistent disk)
 server/user-data/
+store-listing.txt
