@@ -43,7 +43,7 @@ export default function ThreadScreen() {
   // Media viewer state
   const [viewingImageUri, setViewingImageUri] = useState<string | null>(null)
   const [viewingVideoUri, setViewingVideoUri] = useState<string | null>(null)
-  const { playingNoteId, isPlaying: isAudioPlaying, positionMs: audioPositionMs, durationMs: audioDurationMs, toggle: toggleAudio } = useAudioPlayer()
+  const { playingNoteId, isPlaying: isAudioPlaying, positionMs: audioPositionMs, durationMs: audioDurationMs, toggle: toggleAudio, seek: seekAudio } = useAudioPlayer()
   const { isRecording: isVoiceRecording, duration: voiceDuration, meteringLevels: voiceMeteringLevels, startRecording, stopRecording, cancelRecording } = useVoiceRecorder()
 
   // Search state
@@ -199,6 +199,12 @@ export default function ThreadScreen() {
     setViewingVideoUri(uri)
   }, [])
 
+  const handleAudioSeek = useCallback((noteId: string, positionMs: number) => {
+    if (playingNoteId === noteId) {
+      seekAudio(positionMs)
+    }
+  }, [playingNoteId, seekAudio])
+
   const handleLoadMore = useCallback(() => {
     if (hasNextPage) {
       fetchNextPage()
@@ -260,6 +266,7 @@ export default function ThreadScreen() {
               height: pendingAttachment.height,
               duration: pendingAttachment.duration,
               thumbnail: pendingAttachment.thumbnail,
+              waveform: pendingAttachment.waveform,
             },
           })
         }
@@ -547,10 +554,15 @@ export default function ThreadScreen() {
       const result = await stopRecording()
       if (result) {
         setPendingAttachment(result)
+      } else {
+        Alert.alert('Recording Failed', 'The voice recording was too short or could not be saved. Please try again.')
       }
     } else {
       setShowAttachments(false)
-      await startRecording()
+      const started = await startRecording()
+      if (!started) {
+        Alert.alert('Cannot Record', 'Unable to start recording. Make sure the app is in the foreground and microphone access is allowed.')
+      }
     }
   }, [isVoiceRecording, stopRecording, startRecording])
 
@@ -622,6 +634,7 @@ export default function ThreadScreen() {
           onImageView={handleImageView}
           onVideoView={handleVideoView}
           onAudioToggle={toggleAudio}
+          onAudioSeek={handleAudioSeek}
           playingNoteId={playingNoteId}
           isAudioPlaying={isAudioPlaying}
           audioPositionMs={audioPositionMs}

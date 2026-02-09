@@ -26,6 +26,7 @@ export function useThemeColor() {
     borderColor: theme.borderColor?.get() as string,
     // Accents
     accentColor: theme.accentColor?.get() as string,
+    accentColorMuted: theme.accentColorMuted?.get() as string,
     successColor: theme.successColor?.get() as string,
     warningColor: theme.warningColor?.get() as string,
     errorColor: theme.errorColor?.get() as string,

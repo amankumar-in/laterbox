@@ -86,7 +86,20 @@
           "contactsPermission": "Allow LaterBox to access your contacts for sharing."
         }
       ],
-      "expo-video"
+      "expo-video",
+      ["expo-share-intent", {
+        "iosActivationRules": {
+          "NSExtensionActivationSupportsText": true,
+          "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+          "NSExtensionActivationSupportsWebPageWithMaxCount": 1,
+          "NSExtensionActivationSupportsImageWithMaxCount": 10,
+          "NSExtensionActivationSupportsMovieWithMaxCount": 5,
+          "NSExtensionActivationSupportsFileWithMaxCount": 5
+        },
+        "androidIntentFilters": ["text/*", "image/*", "video/*", "audio/*", "application/*"],
+        "androidMultiIntentFilters": ["image/*", "video/*"],
+        "iosAppGroupIdentifier": "group.com.xcore.laterbox.shared"
+      }]
     ],
     "experiments": {
       "typedRoutes": true,

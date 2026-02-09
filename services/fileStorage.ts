@@ -120,6 +120,63 @@ export async function deleteAttachment(storedPath: string): Promise<void> {
   }
 }
 
+const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB
+
+export function categorizeByMimeType(
+  mimeType: string
+): AttachmentCategory {
+  if (mimeType.startsWith('image/')) return 'images'
+  if (mimeType.startsWith('video/')) return 'videos'
+  if (mimeType.startsWith('audio/')) return 'audio'
+  return 'documents'
+}
+
+export async function processSharedFile(file: {
+  path: string
+  fileName: string
+  mimeType: string
+  size: number | null
+}): Promise<{ localUri: string; filename: string; category: AttachmentCategory }> {
+  if (file.size && file.size > MAX_FILE_SIZE) {
+    throw new Error(`File exceeds ${MAX_FILE_SIZE / (1024 * 1024)}MB limit`)
+  }
+
+  const category = categorizeByMimeType(file.mimeType)
+  const result = await saveAttachment(file.path, category, file.fileName)
+
+  return {
+    localUri: result.localUri,
+    filename: result.filename,
+    category,
+  }
+}
+
+export async function downloadImageToLocal(
+  remoteUrl: string,
+  filenamePrefix: string = 'preview'
+): Promise<string | null> {
+  try {
+    await ensureDirectories()
+
+    const ext = remoteUrl.match(/\.(jpg|jpeg|png|webp|gif)/i)?.[1] || 'png'
+    const filename = `${filenamePrefix}_${generateUUID()}.${ext}`
+    const relativePath = `${ATTACHMENTS_DIR}/images/${filename}`
+    const destFile = new File(Paths.document, relativePath)
+
+    const response = await fetch(remoteUrl, {
+      headers: { 'User-Agent': 'LaterBox/1.0 (https://laterbox.app)' },
+    })
+    if (!response.ok) return null
+
+    const arrayBuffer = await response.arrayBuffer()
+    destFile.write(new Uint8Array(arrayBuffer))
+
+    return relativePath
+  } catch {
+    return null
+  }
+}
+
 export async function generateThumbnail(videoStoredPath: string): Promise<string | null> {
   try {
     await ensureDirectories()

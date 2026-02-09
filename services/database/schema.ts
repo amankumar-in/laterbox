@@ -1,6 +1,6 @@
 // SQLite schema definitions for offline-first architecture
 
-export const DATABASE_VERSION = 3
+export const DATABASE_VERSION = 5
 export const DATABASE_NAME = 'laterbox.db'
 
 // Schema for version 1
@@ -61,6 +61,14 @@ export const SCHEMA_V1 = `
     reminder_at TEXT,
     is_completed INTEGER NOT NULL DEFAULT 0,
     completed_at TEXT,
+    notification_id TEXT,
+    -- Link preview fields
+    link_preview_url TEXT,
+    link_preview_title TEXT,
+    link_preview_description TEXT,
+    link_preview_image TEXT,
+    -- Waveform data for voice notes (JSON array of 0-100 integers)
+    attachment_waveform TEXT,
     -- Sync fields
     sync_status TEXT NOT NULL DEFAULT 'pending',
     deleted_at TEXT,
@@ -153,5 +161,14 @@ export const MIGRATIONS: Record<number, string> = {
   `,
   3: `
     ALTER TABLE notes ADD COLUMN notification_id TEXT;
+  `,
+  4: `
+    ALTER TABLE notes ADD COLUMN link_preview_url TEXT;
+    ALTER TABLE notes ADD COLUMN link_preview_title TEXT;
+    ALTER TABLE notes ADD COLUMN link_preview_description TEXT;
+    ALTER TABLE notes ADD COLUMN link_preview_image TEXT;
+  `,
+  5: `
+    ALTER TABLE notes ADD COLUMN attachment_waveform TEXT;
   `,
 }

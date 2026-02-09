@@ -8,6 +8,8 @@ import {
 } from '@/services/notifications/notification.service'
 import type { NoteWithDetails, PaginatedResult, NoteType, CreateNoteInput } from '@/services/database/types'
 import { deleteAttachment } from '@/services/fileStorage'
+import { extractFirstUrl, fetchLinkPreview } from '@/services/linkPreview'
+import { getLinkPreviewMode } from '@/services/storage'
 
 export function useNotes(threadId: string, params?: { limit?: number; isSystemThread?: boolean }) {
   const db = useDb()
@@ -93,11 +95,38 @@ export function useSendNote(threadId: string) {
 
       return note
     },
-    onSuccess: () => {
+    onSuccess: (note) => {
       queryClient.invalidateQueries({ queryKey: ['notes', threadId] })
       queryClient.invalidateQueries({ queryKey: ['thread-media', threadId] })
       queryClient.invalidateQueries({ queryKey: ['threads'] })
       schedulePush()
+
+      // Async link preview fetch for text notes containing URLs (non-blocking)
+      if (note.type === 'text' && note.content && !note.linkPreview) {
+        const url = extractFirstUrl(note.content)
+        if (url) {
+          ;(async () => {
+            try {
+              const mode = await getLinkPreviewMode()
+              if (mode === 'off') return
+
+              const preview = await fetchLinkPreview(url, mode)
+              if (preview.title || preview.description) {
+                await noteRepo.updateLinkPreview(note.id, {
+                  url: preview.url,
+                  title: preview.title ?? undefined,
+                  description: preview.description ?? undefined,
+                  image: preview.localImage ?? preview.imageUrl ?? undefined,
+                })
+                queryClient.invalidateQueries({ queryKey: ['notes', threadId] })
+                schedulePush()
+              }
+            } catch {
+              // Preview fetch failed — note still works without preview
+            }
+          })()
+        }
+      }
     },
   })
 }

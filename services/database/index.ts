@@ -16,10 +16,10 @@ export async function initializeDatabase(db: SQLiteDatabase): Promise<void> {
   // Fresh database - create initial schema
   if (currentVersion === 0) {
     await db.execAsync(SCHEMA_V1)
-    // V1 schema already includes changes from migration 2
-    // (is_system_thread column + Protected Notes thread),
-    // so skip to version 2 to avoid duplicate ALTER TABLE errors.
-    currentVersion = 2
+    // V1 schema already includes columns from migrations 2–5
+    // (is_system_thread, notification_id, link_preview_*, attachment_waveform),
+    // so skip to current version to avoid duplicate ALTER TABLE errors.
+    currentVersion = 5
   }
 
   // Run any pending migrations
@@ -34,13 +34,29 @@ export async function initializeDatabase(db: SQLiteDatabase): Promise<void> {
     currentVersion = nextVersion
   }
 
-  // Ensure notification_id column exists
-  // (handles case where version was set to 3 but ALTER TABLE didn't persist)
+  // Ensure columns exist even if ALTER TABLE didn't persist during migration
   const columns = await db.getAllAsync<{ name: string }>(
     'PRAGMA table_info(notes)'
   )
-  if (!columns.some(col => col.name === 'notification_id')) {
+  const columnNames = new Set(columns.map(col => col.name))
+
+  if (!columnNames.has('notification_id')) {
     await db.execAsync('ALTER TABLE notes ADD COLUMN notification_id TEXT')
+  }
+  if (!columnNames.has('link_preview_url')) {
+    await db.execAsync('ALTER TABLE notes ADD COLUMN link_preview_url TEXT')
+  }
+  if (!columnNames.has('link_preview_title')) {
+    await db.execAsync('ALTER TABLE notes ADD COLUMN link_preview_title TEXT')
+  }
+  if (!columnNames.has('link_preview_description')) {
+    await db.execAsync('ALTER TABLE notes ADD COLUMN link_preview_description TEXT')
+  }
+  if (!columnNames.has('link_preview_image')) {
+    await db.execAsync('ALTER TABLE notes ADD COLUMN link_preview_image TEXT')
+  }
+  if (!columnNames.has('attachment_waveform')) {
+    await db.execAsync('ALTER TABLE notes ADD COLUMN attachment_waveform TEXT')
   }
 
   // Reset stale sync flag — if the app just launched, nothing is syncing

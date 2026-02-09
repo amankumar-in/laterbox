@@ -46,6 +46,12 @@ export interface NoteRow {
   is_completed: number
   completed_at: string | null
   notification_id: string | null
+  // Link preview fields
+  link_preview_url: string | null
+  link_preview_title: string | null
+  link_preview_description: string | null
+  link_preview_image: string | null
+  attachment_waveform: string | null
   sync_status: string
   deleted_at: string | null
   created_at: string
@@ -119,6 +125,11 @@ export interface LocalNote extends SyncableEntity {
   reminderAt: string | null
   isCompleted: number
   completedAt: string | null
+  // Link preview fields
+  linkPreviewUrl: string | null
+  linkPreviewTitle: string | null
+  linkPreviewDescription: string | null
+  linkPreviewImage: string | null
 }
 
 export interface LocalUser extends SyncableEntity {
@@ -168,11 +179,18 @@ export interface CreateNoteInput {
     thumbnail?: string
     width?: number
     height?: number
+    waveform?: number[]
   } | null
   location?: {
     latitude: number
     longitude: number
     address?: string
+  } | null
+  linkPreview?: {
+    url: string
+    title?: string
+    description?: string
+    image?: string
   } | null
 }
 
@@ -221,6 +239,7 @@ export interface NoteWithDetails {
     thumbnail?: string
     width?: number
     height?: number
+    waveform?: number[]
   } | null
   location: {
     latitude: number
@@ -237,6 +256,12 @@ export interface NoteWithDetails {
     completedAt?: string
     notificationId?: string
   }
+  linkPreview: {
+    url: string
+    title?: string
+    description?: string
+    image?: string
+  } | null
   syncStatus: SyncStatus
   createdAt: string
   updatedAt: string

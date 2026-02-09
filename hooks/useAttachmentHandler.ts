@@ -16,6 +16,7 @@ export interface AttachmentResult {
   height?: number
   duration?: number
   thumbnail?: string
+  waveform?: number[]
   // Location fields
   latitude?: number
   longitude?: number

@@ -18,6 +18,7 @@ interface NoteListProps {
   onImageView?: (uri: string) => void
   onVideoView?: (uri: string) => void
   onAudioToggle?: (noteId: string, uri: string) => void
+  onAudioSeek?: (noteId: string, positionMs: number) => void
   playingNoteId?: string | null
   isAudioPlaying?: boolean
   audioPositionMs?: number
@@ -84,6 +85,7 @@ export const NoteList = forwardRef<NoteListRef, NoteListProps>(({
   onImageView,
   onVideoView,
   onAudioToggle,
+  onAudioSeek,
   playingNoteId,
   isAudioPlaying,
   audioPositionMs,
@@ -136,6 +138,7 @@ export const NoteList = forwardRef<NoteListRef, NoteListProps>(({
           onImageView={onImageView}
           onVideoView={onVideoView}
           onAudioToggle={onAudioToggle}
+          onAudioSeek={onAudioSeek}
           playingNoteId={playingNoteId}
           isAudioPlaying={isAudioPlaying}
           audioPositionMs={audioPositionMs}
@@ -145,7 +148,7 @@ export const NoteList = forwardRef<NoteListRef, NoteListProps>(({
         />
       )
     },
-    [onNoteLongPress, onNotePress, onTaskToggle, onImageView, onVideoView, onAudioToggle, playingNoteId, isAudioPlaying, audioPositionMs, audioDurationMs, highlightedNoteId, selectedNoteIds]
+    [onNoteLongPress, onNotePress, onTaskToggle, onImageView, onVideoView, onAudioToggle, onAudioSeek, playingNoteId, isAudioPlaying, audioPositionMs, audioDurationMs, highlightedNoteId, selectedNoteIds]
   )
 
   const keyExtractor = useCallback((item: ListItem) => {

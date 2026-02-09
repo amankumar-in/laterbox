@@ -14,6 +14,7 @@ const APP_FONT_KEY = '@laterbox:appFont'
 const THREAD_VIEW_STYLE_KEY = '@laterbox:threadViewStyle'
 const MINIMAL_MODE_KEY = '@laterbox:minimalMode'
 const MINIMAL_MODE_THREAD_ID_KEY = '@laterbox:minimalModeThreadId'
+const LINK_PREVIEW_MODE_KEY = '@laterbox:linkPreviewMode'
 
 export type AppTheme = 'light' | 'dark' | 'system'
 
@@ -114,6 +115,20 @@ export async function setMinimalModeThreadId(id: string | null): Promise<void> {
   }
 }
 
+export type LinkPreviewMode = 'off' | 'text' | 'text+image'
+
+const VALID_LINK_PREVIEW_MODES: LinkPreviewMode[] = ['off', 'text', 'text+image']
+
+export async function getLinkPreviewMode(): Promise<LinkPreviewMode> {
+  const stored = await AsyncStorage.getItem(LINK_PREVIEW_MODE_KEY)
+  if (stored && VALID_LINK_PREVIEW_MODES.includes(stored as LinkPreviewMode)) return stored as LinkPreviewMode
+  return 'text+image'
+}
+
+export async function setLinkPreviewMode(mode: LinkPreviewMode): Promise<void> {
+  await AsyncStorage.setItem(LINK_PREVIEW_MODE_KEY, mode)
+}
+
 function generateId(): string {
   const timestamp = Date.now().toString(36)
   const randomPart = Math.random().toString(36).substring(2, 15)
@@ -163,7 +178,7 @@ export async function clearAuthToken(): Promise<void> {
 }
 
 export async function clearAll(): Promise<void> {
-  await AsyncStorage.multiRemove([DEVICE_ID_KEY, USER_KEY, AUTH_TOKEN_KEY, THEME_KEY, SYNC_ENABLED_KEY, NOTE_FONT_SCALE_KEY, NOTE_VIEW_STYLE_KEY, APP_FONT_KEY, THREAD_VIEW_STYLE_KEY, MINIMAL_MODE_KEY, MINIMAL_MODE_THREAD_ID_KEY])
+  await AsyncStorage.multiRemove([DEVICE_ID_KEY, USER_KEY, AUTH_TOKEN_KEY, THEME_KEY, SYNC_ENABLED_KEY, NOTE_FONT_SCALE_KEY, NOTE_VIEW_STYLE_KEY, APP_FONT_KEY, THREAD_VIEW_STYLE_KEY, MINIMAL_MODE_KEY, MINIMAL_MODE_THREAD_ID_KEY, LINK_PREVIEW_MODE_KEY])
 }
 
 /**

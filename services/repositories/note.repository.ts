@@ -26,15 +26,21 @@ export class NoteRepository {
     const id = generateUUID()
     const now = getTimestamp()
 
+    // Serialize waveform as JSON string (array of 0-100 integers)
+    const waveformJson = input.attachment?.waveform
+      ? JSON.stringify(input.attachment.waveform)
+      : null
+
     await this.db.runAsync(
       `INSERT INTO notes (
          id, thread_id, content, type,
          attachment_url, attachment_filename, attachment_mime_type,
          attachment_size, attachment_duration, attachment_thumbnail,
-         attachment_width, attachment_height,
+         attachment_width, attachment_height, attachment_waveform,
          location_latitude, location_longitude, location_address,
+         link_preview_url, link_preview_title, link_preview_description, link_preview_image,
          sync_status, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
       [
         id,
         input.threadId,
@@ -48,9 +54,14 @@ export class NoteRepository {
         input.attachment?.thumbnail ?? null,
         input.attachment?.width ?? null,
         input.attachment?.height ?? null,
+        waveformJson,
         input.location?.latitude ?? null,
         input.location?.longitude ?? null,
         input.location?.address ?? null,
+        input.linkPreview?.url ?? null,
+        input.linkPreview?.title ?? null,
+        input.linkPreview?.description ?? null,
+        input.linkPreview?.image ?? null,
         now,
         now,
       ]
@@ -715,6 +726,58 @@ export class NoteRepository {
   }
 
   /**
+   * Get text notes that contain URLs but have no link preview data yet.
+   * Used for backfilling previews when the app comes online.
+   */
+  async getNotesNeedingLinkPreview(limit: number = 10): Promise<NoteWithDetails[]> {
+    const rows = await this.db.getAllAsync<NoteRow>(
+      `SELECT n.*, t.name as thread_name
+       FROM notes n
+       LEFT JOIN threads t ON n.thread_id = t.id
+       WHERE n.type = 'text'
+         AND n.deleted_at IS NULL
+         AND n.link_preview_url IS NULL
+         AND (n.content LIKE '%http://%' OR n.content LIKE '%https://%')
+       ORDER BY n.created_at DESC
+       LIMIT ?`,
+      [limit]
+    )
+
+    return rows.map((row) => this.mapToNote(row))
+  }
+
+  /**
+   * Update link preview data for an existing note (used for async preview fetch after creation)
+   */
+  async updateLinkPreview(
+    noteId: string,
+    data: { url: string; title?: string; description?: string; image?: string }
+  ): Promise<NoteWithDetails | null> {
+    const now = getTimestamp()
+
+    await this.db.runAsync(
+      `UPDATE notes SET
+         link_preview_url = ?,
+         link_preview_title = ?,
+         link_preview_description = ?,
+         link_preview_image = ?,
+         sync_status = 'pending',
+         updated_at = ?
+       WHERE id = ?`,
+      [
+        data.url,
+        data.title ?? null,
+        data.description ?? null,
+        data.image ?? null,
+        now,
+        noteId,
+      ]
+    )
+
+    return this.getById(noteId)
+  }
+
+  /**
    * Update the Protected Notes system thread's lastNote with the most recent locked note
    */
   private async updateProtectedNotesLastNote(now: string): Promise<void> {
@@ -768,6 +831,9 @@ export class NoteRepository {
               thumbnail: row.attachment_thumbnail ?? undefined,
               width: row.attachment_width ?? undefined,
               height: row.attachment_height ?? undefined,
+              waveform: row.attachment_waveform
+                ? JSON.parse(row.attachment_waveform)
+                : undefined,
             }
           : null,
       location:
@@ -788,6 +854,14 @@ export class NoteRepository {
         completedAt: row.completed_at ?? undefined,
         notificationId: row.notification_id ?? undefined,
       },
+      linkPreview: row.link_preview_url
+        ? {
+            url: row.link_preview_url,
+            title: row.link_preview_title ?? undefined,
+            description: row.link_preview_description ?? undefined,
+            image: row.link_preview_image ?? undefined,
+          }
+        : null,
       syncStatus: row.sync_status as SyncStatus,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

@@ -43,7 +43,7 @@ export function useAudioPlayer() {
 
       const { sound } = await Audio.Sound.createAsync(
         { uri },
-        { shouldPlay: true },
+        { shouldPlay: true, progressUpdateIntervalMillis: 100 },
         (status) => {
           if (!status.isLoaded || noteIdRef.current !== noteId) return
 
@@ -72,6 +72,15 @@ export function useAudioPlayer() {
     }
   }, [])
 
+  const seek = useCallback(async (positionMs: number) => {
+    if (!soundRef.current) return
+    try {
+      await soundRef.current.setStatusAsync({ positionMillis: positionMs })
+    } catch (error) {
+      console.warn('[AudioPlayer] Failed to seek:', error)
+    }
+  }, [])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -85,5 +94,6 @@ export function useAudioPlayer() {
     positionMs: state.positionMs,
     durationMs: state.durationMs,
     toggle,
+    seek,
   }
 }

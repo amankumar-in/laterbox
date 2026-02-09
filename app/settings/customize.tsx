@@ -13,7 +13,8 @@ import { useNoteViewStyle } from '../../contexts/NoteViewContext'
 import { useAppFont } from '../../contexts/FontFamilyContext'
 import { useThreadViewStyle } from '../../contexts/ThreadViewContext'
 import { useMinimalMode } from '../../contexts/MinimalModeContext'
-import { FONT_SCALE_STEPS, type FontScale, type NoteViewStyle, type AppFont, type ThreadViewStyle } from '../../services/storage'
+import { useLinkPreviewMode } from '../../contexts/LinkPreviewContext'
+import { FONT_SCALE_STEPS, type FontScale, type NoteViewStyle, type AppFont, type ThreadViewStyle, type LinkPreviewMode } from '../../services/storage'
 import { useUser, useUpdateUser } from '../../hooks/useUser'
 
 const MOCKUP_HEIGHT = 150
@@ -649,6 +650,87 @@ function MinimalModeSelector() {
   )
 }
 
+const LINK_PREVIEW_OPTIONS: { value: LinkPreviewMode; label: string }[] = [
+  { value: 'text+image', label: 'Text & Image' },
+  { value: 'text', label: 'Text' },
+  { value: 'off', label: 'Off' },
+]
+
+function LinkPreviewSelector() {
+  const { linkPreviewMode, setLinkPreviewMode } = useLinkPreviewMode()
+  const { accentColor, iconColor, background } = useThemeColor()
+
+  return (
+    <XStack
+      paddingHorizontal="$4"
+      paddingVertical="$3"
+      gap="$3"
+      alignItems="center"
+    >
+      <XStack
+        width={36}
+        height={36}
+        borderRadius="$2"
+        backgroundColor="$backgroundStrong"
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Ionicons name="link-outline" size={20} color={accentColor} />
+      </XStack>
+
+      <YStack flex={1} gap="$0.5">
+        <Text fontSize="$4" color="$color">
+          URL Previews
+        </Text>
+        <Text fontSize="$2" color="$colorSubtle">
+          {linkPreviewMode === 'off' ? 'Disabled' : linkPreviewMode === 'text' ? 'Title & description only' : 'Full preview with image'}
+        </Text>
+      </YStack>
+
+      <XStack
+        backgroundColor="$backgroundStrong"
+        borderRadius="$4"
+        borderWidth={1}
+        borderColor="$borderColor"
+        padding="$1"
+        gap="$1"
+      >
+        {LINK_PREVIEW_OPTIONS.map((opt) => {
+          const selected = linkPreviewMode === opt.value
+          return (
+            <Pressable
+              key={opt.value}
+              onPress={() => {
+                if (opt.value !== linkPreviewMode) {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                  setLinkPreviewMode(opt.value)
+                }
+              }}
+              style={{
+                backgroundColor: selected ? accentColor : 'transparent',
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 6,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <Text
+                fontSize="$2"
+                fontWeight={selected ? '600' : '400'}
+                color={selected ? background : '$colorSubtle'}
+              >
+                {opt.label}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </XStack>
+    </XStack>
+  )
+}
+
 type ThemeOption = 'system' | 'dark' | 'light'
 
 const OPTIONS: { value: ThemeOption; label: string; variant: 'auto' | 'dark' | 'light' }[] = [
@@ -766,6 +848,10 @@ export default function CustomizeScreen() {
         <Separator />
 
         <MinimalModeSelector />
+
+        <Separator />
+
+        <LinkPreviewSelector />
       </ScrollView>
     </YStack>
   )

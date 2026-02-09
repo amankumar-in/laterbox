@@ -8,6 +8,7 @@ import { TamaguiProvider, Theme } from 'tamagui'
 import { PortalProvider } from '@tamagui/portal'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
 import Shortcuts from '@rn-org/react-native-shortcuts'
 import {
@@ -57,9 +58,12 @@ import { FontFamilyProvider, useAppFont } from '@/contexts/FontFamilyContext'
 import { NoteViewProvider } from '@/contexts/NoteViewContext'
 import { ThreadViewProvider } from '@/contexts/ThreadViewContext'
 import { MinimalModeProvider } from '@/contexts/MinimalModeContext'
+import { LinkPreviewProvider } from '@/contexts/LinkPreviewContext'
+import { useShareIntent } from 'expo-share-intent'
 import { useInitializeLocalUser } from '@/hooks/useUser'
 import { useAutoSync } from '@/hooks/useSyncService'
 import { useNotifications } from '@/hooks/useNotifications'
+import { useLinkPreviewBackfill } from '@/hooks/useLinkPreviewBackfill'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,10 +85,22 @@ function AppContent() {
   // Initialize local notifications for task reminders
   useNotifications()
 
+  // Backfill link previews for notes created while offline
+  useLinkPreviewBackfill()
+
   useEffect(() => {
     // Initialize local user - NO SERVER CALLS
     initializeLocalUser.mutate()
   }, [])
+
+  // Handle share intent (content shared from other apps)
+  const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent()
+
+  useEffect(() => {
+    if (hasShareIntent) {
+      router.push('/share')
+    }
+  }, [hasShareIntent, router])
 
   // Handle shortcut navigation
   useEffect(() => {
@@ -169,6 +185,7 @@ export default function RootLayout() {
   }
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaProvider>
       <KeyboardProvider>
         <QueryClientProvider client={queryClient}>
@@ -177,11 +194,13 @@ export default function RootLayout() {
               <FontScaleProvider>
                 <NoteViewProvider>
                   <ThreadViewProvider>
-                    <DatabaseProvider>
-                      <MinimalModeProvider>
-                        <ThemedRoot />
-                      </MinimalModeProvider>
-                    </DatabaseProvider>
+                    <LinkPreviewProvider>
+                      <DatabaseProvider>
+                        <MinimalModeProvider>
+                          <ThemedRoot />
+                        </MinimalModeProvider>
+                      </DatabaseProvider>
+                    </LinkPreviewProvider>
                   </ThreadViewProvider>
                 </NoteViewProvider>
               </FontScaleProvider>
@@ -190,5 +209,6 @@ export default function RootLayout() {
         </QueryClientProvider>
       </KeyboardProvider>
     </SafeAreaProvider>
+    </GestureHandlerRootView>
   )
 }

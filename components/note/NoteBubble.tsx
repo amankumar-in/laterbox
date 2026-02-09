@@ -1,14 +1,16 @@
-import { useState } from 'react'
-import { XStack, YStack, Text } from 'tamagui'
-import { Alert, Linking, Pressable } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
+import { useCallback, useMemo, useState } from 'react'
+import { Alert, Linking, Pressable, View } from 'react-native'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import FileViewer from 'react-native-file-viewer'
-import { useThemeColor } from '../../hooks/useThemeColor'
+import { Text, XStack, YStack } from 'tamagui'
 import { useNoteFontScale } from '../../contexts/FontScaleContext'
 import { useNoteViewStyle } from '../../contexts/NoteViewContext'
-import { resolveAttachmentUri, attachmentExists } from '../../services/fileStorage'
+import { useThemeColor } from '../../hooks/useThemeColor'
+import { attachmentExists, resolveAttachmentUri } from '../../services/fileStorage'
 import type { NoteWithDetails } from '../../types'
+import { LinkPreviewCard } from '../share/LinkPreviewCard'
 
 interface NoteBubbleProps {
   note: NoteWithDetails
@@ -18,6 +20,7 @@ interface NoteBubbleProps {
   onImageView?: (uri: string) => void
   onVideoView?: (uri: string) => void
   onAudioToggle?: (noteId: string, uri: string) => void
+  onAudioSeek?: (noteId: string, positionMs: number) => void
   playingNoteId?: string | null
   isAudioPlaying?: boolean
   audioPositionMs?: number
@@ -26,20 +29,43 @@ interface NoteBubbleProps {
   isSelected?: boolean
 }
 
-const WAVEFORM_BAR_COUNT = 28
+// Waveform bar dimensions (px)
+const BAR_WIDTH = 3
+const BAR_GAP = 1.5
+const BAR_STEP = BAR_WIDTH + BAR_GAP // 4.5px per bar
+const BAR_MAX_HEIGHT = 28
 
-function generateWaveform(noteId: string): number[] {
-  let hash = 0
-  for (let i = 0; i < noteId.length; i++) {
-    hash = ((hash << 5) - hash + noteId.charCodeAt(i)) | 0
+/** Resample a waveform array to a target bar count (max-in-bucket down, lerp up) */
+function resampleWaveform(waveform: number[], targetCount: number): number[] {
+  const len = waveform.length
+  if (len === 0 || targetCount <= 0) return []
+  if (len === targetCount) return waveform
+
+  const result: number[] = new Array(targetCount)
+
+  if (targetCount < len) {
+    for (let i = 0; i < targetCount; i++) {
+      const start = (i / targetCount) * len
+      const end = ((i + 1) / targetCount) * len
+      const fromIdx = Math.floor(start)
+      const toIdx = Math.min(Math.ceil(end), len)
+      let max = 0
+      for (let j = fromIdx; j < toIdx; j++) {
+        if (waveform[j] > max) max = waveform[j]
+      }
+      result[i] = max
+    }
+  } else {
+    for (let i = 0; i < targetCount; i++) {
+      const srcIndex = (i / (targetCount - 1)) * (len - 1)
+      const lower = Math.floor(srcIndex)
+      const upper = Math.min(lower + 1, len - 1)
+      const fraction = srcIndex - lower
+      result[i] = waveform[lower] * (1 - fraction) + waveform[upper] * fraction
+    }
   }
-  const bars: number[] = []
-  for (let i = 0; i < WAVEFORM_BAR_COUNT; i++) {
-    hash = (hash * 1664525 + 1013904223) | 0
-    const value = Math.abs(hash % 100) / 100
-    bars.push(0.15 + value * 0.85)
-  }
-  return bars
+
+  return result
 }
 
 function formatTime(dateString: string): string {
@@ -85,7 +111,6 @@ function MissingFile({ icon, label, iconColor }: { icon: string; label: string; 
       paddingVertical="$2"
       alignItems="center"
       gap="$2"
-      minWidth={180}
       opacity={0.7}
     >
       <Ionicons name={icon as any} size={20} color={iconColor} />
@@ -94,16 +119,181 @@ function MissingFile({ icon, label, iconColor }: { icon: string; label: string; 
   )
 }
 
+/** Fixed-width voice waveform with tap/drag-to-seek (WhatsApp-style) */
+function VoiceWaveform({
+  note,
+  playingNoteId,
+  isAudioPlaying,
+  audioPositionMs,
+  audioDurationMs,
+  onAudioToggle,
+  onAudioSeek,
+  scaledFontSize,
+  contentColor,
+  iconColor,
+  accentColor,
+  accentColorMuted,
+  background,
+}: {
+  note: NoteWithDetails
+  playingNoteId: string | null
+  isAudioPlaying: boolean
+  audioPositionMs: number
+  audioDurationMs: number
+  onAudioToggle?: (noteId: string, uri: string) => void
+  onAudioSeek?: (noteId: string, positionMs: number) => void
+  scaledFontSize: number
+  contentColor: string
+  iconColor: string
+  accentColor: string
+  accentColorMuted: string
+  background: string
+}) {
+  const [containerWidth, setContainerWidth] = useState(0)
+  const voiceExists = note.attachment?.url ? attachmentExists(note.attachment.url) : false
+
+  if (note.attachment?.url && !voiceExists) {
+    return (
+      <YStack>
+        <MissingFile icon="mic-outline" label="Voice note unavailable" iconColor={iconColor} />
+        {note.content && (
+          <Text fontSize={scaledFontSize} marginTop="$2" color={contentColor}>
+            {note.content}
+          </Text>
+        )}
+      </YStack>
+    )
+  }
+
+  const waveform = note.attachment?.waveform
+  const totalDuration = note.attachment?.duration || 0
+
+  const isThisPlaying = playingNoteId === note.id && isAudioPlaying
+  const isThisActive = playingNoteId === note.id
+
+  const progressRatio = isThisActive && audioDurationMs > 0
+    ? audioPositionMs / audioDurationMs
+    : 0
+
+  const displayTime = isThisActive
+    ? `${formatDuration(audioPositionMs / 1000)} / ${formatDuration(totalDuration)}`
+    : formatDuration(totalDuration)
+
+  // Calculate bar count from available width and resample
+  const barCount = containerWidth > 0 ? Math.floor(containerWidth / BAR_STEP) : 0
+  const resampledWaveform = useMemo(
+    () => (waveform && barCount > 0 ? resampleWaveform(waveform, barCount) : null),
+    [waveform, barCount]
+  )
+
+  const playedBarCount = resampledWaveform
+    ? Math.floor(progressRatio * resampledWaveform.length)
+    : 0
+
+  // Seek handler: convert X position to audio position
+  const seekToX = useCallback((x: number) => {
+    if (!isThisActive || audioDurationMs <= 0 || containerWidth <= 0) return
+    const ratio = Math.max(0, Math.min(1, x / containerWidth))
+    onAudioSeek?.(note.id, ratio * audioDurationMs)
+  }, [isThisActive, audioDurationMs, containerWidth, note.id, onAudioSeek])
+
+  const panGesture = Gesture.Pan()
+    .onUpdate((e) => seekToX(e.x))
+    .minDistance(0)
+    .activeOffsetX([-5, 5])
+
+  const tapGesture = Gesture.Tap()
+    .onEnd((e) => seekToX(e.x))
+
+  const composedGesture = Gesture.Simultaneous(tapGesture, panGesture)
+
+  return (
+    <YStack>
+      <Pressable onPress={() => {
+        if (note.attachment?.url) {
+          onAudioToggle?.(note.id, resolveAttachmentUri(note.attachment.url))
+        }
+      }}>
+        <XStack alignItems="center" gap="$2">
+          <XStack
+            width={36}
+            height={36}
+            borderRadius={18}
+            backgroundColor={background}
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Ionicons name={isThisPlaying ? 'pause' : 'play'} size={20} color={accentColor} />
+          </XStack>
+          <YStack flex={1} gap="$1">
+            {resampledWaveform && resampledWaveform.length > 0 ? (
+              <GestureDetector gesture={composedGesture}>
+                <View
+                  style={{ height: BAR_MAX_HEIGHT, flexDirection: 'row', alignItems: 'center', gap: BAR_GAP }}
+                  onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+                >
+                  {resampledWaveform.map((level, i) => (
+                    <View
+                      key={i}
+                      style={{
+                        width: BAR_WIDTH,
+                        borderRadius: BAR_WIDTH / 2,
+                        height: Math.max(3, (level / 100) * BAR_MAX_HEIGHT),
+                        backgroundColor: i < playedBarCount ? accentColor : accentColorMuted,
+                      }}
+                    />
+                  ))}
+                </View>
+              </GestureDetector>
+            ) : (
+              <YStack
+                height={BAR_MAX_HEIGHT}
+                justifyContent="center"
+                onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+              >
+                <YStack
+                  height={4}
+                  borderRadius={2}
+                  backgroundColor="$accentColorMuted"
+                  overflow="hidden"
+                >
+                  <YStack
+                    height={4}
+                    borderRadius={2}
+                    backgroundColor="$accentColor"
+                    width={`${Math.round(progressRatio * 100)}%`}
+                  />
+                </YStack>
+              </YStack>
+            )}
+            <Text fontSize="$2" color="$colorSubtle">
+              {displayTime}
+            </Text>
+          </YStack>
+        </XStack>
+      </Pressable>
+      {note.content && (
+        <Text fontSize={scaledFontSize} marginTop="$2" color={contentColor}>
+          {note.content}
+        </Text>
+      )}
+    </YStack>
+  )
+}
+
 const MAX_LINES = 30
 
-export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageView, onVideoView, onAudioToggle, playingNoteId, isAudioPlaying, audioPositionMs = 0, audioDurationMs = 0, isHighlighted = false, isSelected = false }: NoteBubbleProps) {
-  const { brandText, paperText, iconColor, accentColor, background } = useThemeColor()
+export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageView, onVideoView, onAudioToggle, onAudioSeek, playingNoteId, isAudioPlaying, audioPositionMs = 0, audioDurationMs = 0, isHighlighted = false, isSelected = false }: NoteBubbleProps) {
+  const { brandText, paperText, iconColor, accentColor, accentColorMuted, background } = useThemeColor()
   const { fontScale } = useNoteFontScale()
   const { noteViewStyle } = useNoteViewStyle()
   const isPaper = noteViewStyle === 'paper'
   const scaledFontSize = Math.round(14 * fontScale)
   const contentColor = isPaper ? paperText : brandText
   const [isExpanded, setIsExpanded] = useState(false)
+
+  // Non-text types and text with link preview should fill the bubble width
+  const isMediaType = note.type !== 'text' || note.linkPreview != null
 
   const handleLongPress = () => {
     onLongPress(note)
@@ -139,7 +329,7 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
               }}>
                 <Image
                   source={{ uri: resolveAttachmentUri(note.attachment.url) }}
-                  style={{ width: 200, height: 150, borderRadius: 8 }}
+                  style={{ width: '100%', height: 200, borderRadius: 8 }}
                   contentFit="cover"
                 />
               </Pressable>
@@ -149,8 +339,8 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
               <XStack
                 backgroundColor="$backgroundStrong"
                 borderRadius="$3"
-                width={200}
-                height={150}
+                width="100%"
+                height={200}
                 alignItems="center"
                 justifyContent="center"
               >
@@ -182,15 +372,15 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
                   {note.attachment?.thumbnail && attachmentExists(note.attachment.thumbnail) ? (
                     <Image
                       source={{ uri: resolveAttachmentUri(note.attachment.thumbnail) }}
-                      style={{ width: 200, height: 150, borderRadius: 8 }}
+                      style={{ width: '100%', height: 200, borderRadius: 8 }}
                       contentFit="cover"
                     />
                   ) : (
                     <XStack
                       backgroundColor="$backgroundStrong"
                       borderRadius="$3"
-                      width={200}
-                      height={150}
+                      width="100%"
+                      height={200}
                       alignItems="center"
                       justifyContent="center"
                     >
@@ -244,71 +434,22 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
       }
 
       case 'voice': {
-        const voiceExists = note.attachment?.url ? attachmentExists(note.attachment.url) : false
-        if (note.attachment?.url && !voiceExists) {
-          return (
-            <YStack>
-              <MissingFile icon="mic-outline" label="Voice note unavailable" iconColor={iconColor} />
-              {note.content && (
-                <Text fontSize={scaledFontSize} marginTop="$2" color={contentColor}>
-                  {note.content}
-                </Text>
-              )}
-            </YStack>
-          )
-        }
-        const isThisPlaying = playingNoteId === note.id && isAudioPlaying
-        const isThisActive = playingNoteId === note.id
-        const waveformBars = generateWaveform(note.id)
-        const progressRatio = isThisActive && audioDurationMs > 0
-          ? audioPositionMs / audioDurationMs
-          : 0
-        const playedBars = Math.floor(progressRatio * WAVEFORM_BAR_COUNT)
-        const displayTime = isThisActive
-          ? formatDuration(audioPositionMs / 1000)
-          : formatDuration(note.attachment?.duration || 0)
         return (
-          <YStack>
-            <Pressable onPress={() => {
-              if (note.attachment?.url) {
-                onAudioToggle?.(note.id, resolveAttachmentUri(note.attachment.url))
-              }
-            }}>
-              <XStack alignItems="center" gap="$2" minWidth={200}>
-                <XStack
-                  width={36}
-                  height={36}
-                  borderRadius={18}
-                  backgroundColor={background}
-                  alignItems="center"
-                  justifyContent="center"
-                >
-                  <Ionicons name={isThisPlaying ? 'pause' : 'play'} size={20} color={accentColor} />
-                </XStack>
-                <YStack flex={1} gap="$1">
-                  <XStack height={28} alignItems="center" gap={2}>
-                    {waveformBars.map((level, i) => (
-                      <YStack
-                        key={i}
-                        width={3}
-                        borderRadius={1.5}
-                        height={Math.max(4, level * 24)}
-                        backgroundColor={i < playedBars ? '$color' : '$accentColorMuted'}
-                      />
-                    ))}
-                  </XStack>
-                  <Text fontSize="$2" color="$colorSubtle">
-                    {displayTime}
-                  </Text>
-                </YStack>
-              </XStack>
-            </Pressable>
-            {note.content && (
-              <Text fontSize={scaledFontSize} marginTop="$2" color={contentColor}>
-                {note.content}
-              </Text>
-            )}
-          </YStack>
+          <VoiceWaveform
+            note={note}
+            playingNoteId={playingNoteId ?? null}
+            isAudioPlaying={isAudioPlaying ?? false}
+            audioPositionMs={audioPositionMs}
+            audioDurationMs={audioDurationMs}
+            onAudioToggle={onAudioToggle}
+            onAudioSeek={onAudioSeek}
+            scaledFontSize={scaledFontSize}
+            contentColor={contentColor}
+            iconColor={iconColor}
+            accentColor={accentColor}
+            accentColorMuted={accentColorMuted}
+            background={background}
+          />
         )
       }
 
@@ -325,7 +466,7 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
         }
         return (
           <Pressable onPress={() => note.attachment?.url && openDocument(note.attachment.url)}>
-            <XStack alignItems="center" gap="$2" minWidth={180}>
+            <XStack alignItems="center" gap="$2">
               <XStack
                 width={40}
                 height={40}
@@ -356,7 +497,7 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
               <XStack
                 backgroundColor="$backgroundStrong"
                 borderRadius="$3"
-                width={200}
+                width="100%"
                 height={120}
                 alignItems="center"
                 justifyContent="center"
@@ -375,7 +516,7 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
 
       case 'contact':
         return (
-          <YStack gap="$1" minWidth={180}>
+          <YStack gap="$1">
             <XStack alignItems="center" gap="$2">
               <XStack
                 width={40}
@@ -417,7 +558,7 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
               onAudioToggle?.(note.id, resolveAttachmentUri(note.attachment.url))
             }
           }}>
-            <XStack alignItems="center" gap="$2" minWidth={180}>
+            <XStack alignItems="center" gap="$2">
               <XStack
                 width={36}
                 height={36}
@@ -445,17 +586,31 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
         const displayContent = !isExpanded && needsTruncation
           ? note.content?.split('\n').slice(0, MAX_LINES).join('\n')
           : note.content
+        // Hide raw text if it's just a URL and we have a link preview with a title
+        const contentIsJustUrl = note.linkPreview?.title && note.content?.trim().match(/^https?:\/\/\S+$/)
         return (
           <YStack>
-            <Text fontSize={scaledFontSize} color={contentColor}>
-              {displayContent}
-            </Text>
-            {needsTruncation && (
+            {!contentIsJustUrl && (
+              <Text fontSize={scaledFontSize} color={contentColor}>
+                {displayContent}
+              </Text>
+            )}
+            {!contentIsJustUrl && needsTruncation && (
               <Pressable onPress={toggleExpand}>
                 <Text fontSize="$3" color="$accentColor" marginTop="$1" fontWeight="600">
                   {isExpanded ? 'Show less' : 'View more...'}
                 </Text>
               </Pressable>
+            )}
+            {note.linkPreview && (
+              <YStack marginTop={contentIsJustUrl ? 0 : '$2'}>
+                <LinkPreviewCard
+                  url={note.linkPreview.url}
+                  title={note.linkPreview.title}
+                  description={note.linkPreview.description}
+                  image={note.linkPreview.image}
+                />
+              </YStack>
             )}
           </YStack>
         )
@@ -488,7 +643,7 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
           borderRadius={isPaper ? 0 : '$4'}
           borderBottomRightRadius={isPaper ? 0 : '$1'}
           maxWidth={isPaper ? '100%' : '80%'}
-          width={isPaper ? '100%' : undefined}
+          width={isPaper ? '100%' : isMediaType ? '80%' : undefined}
           position="relative"
           borderWidth={isPaper ? 0 : note.isStarred ? 1 : 0}
           borderColor="#F59E0B"
