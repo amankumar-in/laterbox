@@ -1,6 +1,6 @@
 // SQLite schema definitions for offline-first architecture
 
-export const DATABASE_VERSION = 10
+export const DATABASE_VERSION = 11
 export const DATABASE_NAME = 'laterbox.db'
 
 // Schema for version 1
@@ -233,6 +233,8 @@ export const SCHEMA_V1 = `
     to_side TEXT NOT NULL DEFAULT 'left',
     color TEXT NOT NULL DEFAULT '#888888',
     stroke_width REAL NOT NULL DEFAULT 2,
+    arrow_start INTEGER NOT NULL DEFAULT 0,
+    arrow_end INTEGER NOT NULL DEFAULT 1,
     sync_status TEXT NOT NULL DEFAULT 'pending',
     deleted_at TEXT,
     created_at TEXT NOT NULL,
@@ -446,5 +448,9 @@ export const MIGRATIONS: Record<number, string> = {
     ALTER TABLE board_strokes ADD COLUMN group_id TEXT;
     CREATE INDEX IF NOT EXISTS idx_board_items_group_id ON board_items(group_id);
     CREATE INDEX IF NOT EXISTS idx_board_strokes_group_id ON board_strokes(group_id);
+  `,
+  11: `
+    ALTER TABLE board_connections ADD COLUMN arrow_start INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE board_connections ADD COLUMN arrow_end INTEGER NOT NULL DEFAULT 1;
   `,
 }

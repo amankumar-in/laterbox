@@ -386,6 +386,8 @@ export interface BoardConnectionRow {
   to_side: string
   color: string
   stroke_width: number
+  arrow_start: number
+  arrow_end: number
   sync_status: string
   deleted_at: string | null
   created_at: string
@@ -456,6 +458,8 @@ export interface BoardConnection {
   toSide: string
   color: string
   strokeWidth: number
+  arrowStart: boolean
+  arrowEnd: boolean
   syncStatus: SyncStatus
   createdAt: string
   updatedAt: string
@@ -528,4 +532,15 @@ export interface CreateBoardConnectionInput {
   toSide: string
   color?: string
   strokeWidth?: number
+  arrowStart?: boolean
+  arrowEnd?: boolean
+}
+
+export interface UpdateBoardConnectionInput {
+  fromSide?: string
+  toSide?: string
+  color?: string
+  strokeWidth?: number
+  arrowStart?: boolean
+  arrowEnd?: boolean
 }

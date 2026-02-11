@@ -19,6 +19,7 @@ import {
   type UpdateBoardItemInput,
   type CreateBoardStrokeInput,
   type CreateBoardConnectionInput,
+  type UpdateBoardConnectionInput,
 } from '../database'
 
 export class BoardRepository {
@@ -277,9 +278,9 @@ export class BoardRepository {
     const now = getTimestamp()
 
     await this.db.runAsync(
-      `INSERT INTO board_connections (id, board_id, from_item_id, to_item_id, from_side, to_side, color, stroke_width, sync_status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
-      [id, input.boardId, input.fromItemId, input.toItemId, input.fromSide, input.toSide, input.color ?? '#888888', input.strokeWidth ?? 2, now, now]
+      `INSERT INTO board_connections (id, board_id, from_item_id, to_item_id, from_side, to_side, color, stroke_width, arrow_start, arrow_end, sync_status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      [id, input.boardId, input.fromItemId, input.toItemId, input.fromSide, input.toSide, input.color ?? '#888888', input.strokeWidth ?? 2, input.arrowStart ? 1 : 0, input.arrowEnd !== false ? 1 : 0, now, now]
     )
 
     return this.getConnectionById(id) as Promise<BoardConnection>
@@ -302,13 +303,16 @@ export class BoardRepository {
     return rows.map((row) => this.mapToConnection(row))
   }
 
-  async updateConnection(id: string, input: { fromSide?: string; toSide?: string; color?: string }): Promise<void> {
+  async updateConnection(id: string, input: UpdateBoardConnectionInput): Promise<void> {
     const updates: string[] = []
     const values: (string | number)[] = []
 
     if (input.fromSide !== undefined) { updates.push('from_side = ?'); values.push(input.fromSide) }
     if (input.toSide !== undefined) { updates.push('to_side = ?'); values.push(input.toSide) }
     if (input.color !== undefined) { updates.push('color = ?'); values.push(input.color) }
+    if (input.strokeWidth !== undefined) { updates.push('stroke_width = ?'); values.push(input.strokeWidth) }
+    if (input.arrowStart !== undefined) { updates.push('arrow_start = ?'); values.push(input.arrowStart ? 1 : 0) }
+    if (input.arrowEnd !== undefined) { updates.push('arrow_end = ?'); values.push(input.arrowEnd ? 1 : 0) }
 
     if (updates.length === 0) return
 
@@ -459,6 +463,8 @@ export class BoardRepository {
       toSide: row.to_side,
       color: row.color,
       strokeWidth: row.stroke_width,
+      arrowStart: !!row.arrow_start,
+      arrowEnd: !!row.arrow_end,
       syncStatus: row.sync_status as SyncStatus,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

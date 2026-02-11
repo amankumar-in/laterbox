@@ -16,10 +16,10 @@ export async function initializeDatabase(db: SQLiteDatabase): Promise<void> {
   // Fresh database - create initial schema
   if (currentVersion === 0) {
     await db.execAsync(SCHEMA_V1)
-    // V1 schema already includes columns from migrations 2–10
-    // (is_system_thread, notification_id, link_preview_*, attachment_waveform, thread is_locked, note is_pinned, boards, font_weight, group_id),
+    // V1 schema already includes columns from migrations 2–11
+    // (is_system_thread, notification_id, link_preview_*, attachment_waveform, thread is_locked, note is_pinned, boards, font_weight, group_id, arrow_start/end),
     // so skip to current version to avoid duplicate ALTER TABLE errors.
-    currentVersion = 10
+    currentVersion = 11
   }
 
   // Run any pending migrations
@@ -129,6 +129,12 @@ export async function initializeDatabase(db: SQLiteDatabase): Promise<void> {
     }
     if (!bcColumnNames.has('stroke_width')) {
       await db.execAsync('ALTER TABLE board_connections ADD COLUMN stroke_width REAL NOT NULL DEFAULT 2')
+    }
+    if (!bcColumnNames.has('arrow_start')) {
+      await db.execAsync('ALTER TABLE board_connections ADD COLUMN arrow_start INTEGER NOT NULL DEFAULT 0')
+    }
+    if (!bcColumnNames.has('arrow_end')) {
+      await db.execAsync('ALTER TABLE board_connections ADD COLUMN arrow_end INTEGER NOT NULL DEFAULT 1')
     }
   }
 

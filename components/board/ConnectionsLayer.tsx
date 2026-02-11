@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import React, { useMemo } from 'react'
 import { Canvas, Path, Skia } from '@shopify/react-native-skia'
 import type { BoardConnection, BoardItem } from '../../types'
 
@@ -40,6 +40,21 @@ function getEdgeMidpoint(
   }
 }
 
+function makeArrowhead(tipX: number, tipY: number, angle: number, size: number): any {
+  const arrowPath = Skia.Path.Make()
+  arrowPath.moveTo(tipX, tipY)
+  arrowPath.lineTo(
+    tipX - size * Math.cos(angle - Math.PI / 6),
+    tipY - size * Math.sin(angle - Math.PI / 6)
+  )
+  arrowPath.moveTo(tipX, tipY)
+  arrowPath.lineTo(
+    tipX - size * Math.cos(angle + Math.PI / 6),
+    tipY - size * Math.sin(angle + Math.PI / 6)
+  )
+  return arrowPath
+}
+
 export function ConnectionsLayer({
   connections,
   items,
@@ -71,7 +86,6 @@ export function ConnectionsLayer({
 
       const isSelected = selectedConnectionIds.has(conn.id)
 
-      // Determine if we need a curve: if endpoints are too close or same axis
       const dx = to.x - from.x
       const dy = to.y - from.y
       const dist = Math.sqrt(dx * dx + dy * dy)
@@ -80,17 +94,13 @@ export function ConnectionsLayer({
       path.moveTo(from.x, from.y)
 
       if (dist < 30 * scale) {
-        // Very short — just straight line
         path.lineTo(to.x, to.y)
       } else {
-        // Use a smooth curve via control point
         const midX = (from.x + to.x) / 2
         const midY = (from.y + to.y) / 2
-        // Offset the control point perpendicular to the line
         const perpX = -(to.y - from.y) / dist * 30 * scale
         const perpY = (to.x - from.x) / dist * 30 * scale
 
-        // Only curve if the straight path would look weird (same side connections)
         const needsCurve = conn.fromSide === conn.toSide
         if (needsCurve) {
           path.quadTo(midX + perpX, midY + perpY, to.x, to.y)
@@ -99,23 +109,21 @@ export function ConnectionsLayer({
         }
       }
 
-      // Arrowhead
       const arrowSize = 10 * scale
-      const angle = Math.atan2(to.y - from.y, to.x - from.x)
-      const arrowPath = Skia.Path.Make()
-      arrowPath.moveTo(to.x, to.y)
-      arrowPath.lineTo(
-        to.x - arrowSize * Math.cos(angle - Math.PI / 6),
-        to.y - arrowSize * Math.sin(angle - Math.PI / 6)
-      )
-      arrowPath.moveTo(to.x, to.y)
-      arrowPath.lineTo(
-        to.x - arrowSize * Math.cos(angle + Math.PI / 6),
-        to.y - arrowSize * Math.sin(angle + Math.PI / 6)
-      )
+      const angleToEnd = Math.atan2(to.y - from.y, to.x - from.x)
+      const angleToStart = angleToEnd + Math.PI // reverse direction
 
-      return { conn, path, arrowPath, isSelected }
-    }).filter(Boolean) as { conn: BoardConnection; path: any; arrowPath: any; isSelected: boolean }[]
+      // Build arrow paths based on arrowStart/arrowEnd
+      const arrowPaths: any[] = []
+      if (conn.arrowEnd) {
+        arrowPaths.push(makeArrowhead(to.x, to.y, angleToEnd, arrowSize))
+      }
+      if (conn.arrowStart) {
+        arrowPaths.push(makeArrowhead(from.x, from.y, angleToStart, arrowSize))
+      }
+
+      return { conn, path, arrowPaths, isSelected }
+    }).filter(Boolean) as { conn: BoardConnection; path: any; arrowPaths: any[]; isSelected: boolean }[]
   }, [connections, itemMap, translateX, translateY, scale, selectedConnectionIds, localOverrides])
 
   return (
@@ -129,26 +137,53 @@ export function ConnectionsLayer({
         pointerEvents: 'none',
       }}
     >
-      {connectionPaths.map(({ conn, path, arrowPath, isSelected }) => (
+      {/* Selection outline — rendered behind the actual line */}
+      {connectionPaths.map(({ conn, path, arrowPaths, isSelected }) =>
+        isSelected ? (
+          <React.Fragment key={`sel-${conn.id}`}>
+            <Path
+              path={path}
+              color="#3b82f6"
+              style="stroke"
+              strokeWidth={(conn.strokeWidth + 6) * scale}
+              strokeCap="round"
+            />
+            {arrowPaths.map((ap, i) => (
+              <Path
+                key={`sel-arrow-${conn.id}-${i}`}
+                path={ap}
+                color="#3b82f6"
+                style="stroke"
+                strokeWidth={(conn.strokeWidth + 6) * scale}
+                strokeCap="round"
+              />
+            ))}
+          </React.Fragment>
+        ) : null
+      )}
+      {/* Actual lines on top — always use real color */}
+      {connectionPaths.map(({ conn, path, isSelected }) => (
         <Path
           key={conn.id}
           path={path}
-          color={isSelected ? '#3b82f6' : conn.color}
+          color={conn.color}
           style="stroke"
-          strokeWidth={(isSelected ? conn.strokeWidth + 1 : conn.strokeWidth) * scale}
+          strokeWidth={conn.strokeWidth * scale}
           strokeCap="round"
         />
       ))}
-      {connectionPaths.map(({ conn, arrowPath, isSelected }) => (
-        <Path
-          key={`arrow-${conn.id}`}
-          path={arrowPath}
-          color={isSelected ? '#3b82f6' : conn.color}
-          style="stroke"
-          strokeWidth={(isSelected ? conn.strokeWidth + 1 : conn.strokeWidth) * scale}
-          strokeCap="round"
-        />
-      ))}
+      {connectionPaths.map(({ conn, arrowPaths }) =>
+        arrowPaths.map((ap, i) => (
+          <Path
+            key={`arrow-${conn.id}-${i}`}
+            path={ap}
+            color={conn.color}
+            style="stroke"
+            strokeWidth={conn.strokeWidth * scale}
+            strokeCap="round"
+          />
+        ))
+      )}
     </Canvas>
   )
 }

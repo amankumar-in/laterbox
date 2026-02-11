@@ -72,6 +72,15 @@ interface DrawingToolbarProps {
   onCopy?: () => void
   onPaste?: () => void
   onMarqueeToggle?: () => void
+  // Connection editing (shown when a connection is selected)
+  connectionSelected?: boolean
+  connectionArrowStart?: boolean
+  connectionArrowEnd?: boolean
+  connectionStrokeWidth?: number
+  onConnectionArrowStartToggle?: () => void
+  onConnectionArrowEndToggle?: () => void
+  onConnectionArrowNone?: () => void
+  onConnectionWidthChange?: (width: number) => void
 }
 
 export function DrawingToolbar({
@@ -104,6 +113,14 @@ export function DrawingToolbar({
   onCopy,
   onPaste,
   onMarqueeToggle,
+  connectionSelected,
+  connectionArrowStart,
+  connectionArrowEnd,
+  connectionStrokeWidth,
+  onConnectionArrowStartToggle,
+  onConnectionArrowEndToggle,
+  onConnectionArrowNone,
+  onConnectionWidthChange,
 }: DrawingToolbarProps) {
   const { resolvedTheme } = useAppTheme()
   const { iconColor, iconColorStrong, background, accentColor } = useThemeColor()
@@ -161,8 +178,36 @@ export function DrawingToolbar({
           })}
         </XStack>
 
-        {/* Right side: thickness OR text controls */}
-        {textSelected ? (
+        {/* Right side: thickness OR text controls OR connection controls */}
+        {connectionSelected ? (
+          /* Connection width controls only — arrows moved to row 2 */
+          <XStack gap="$3" alignItems="center">
+            {THICKNESS_OPTIONS.map((opt) => {
+              const isActive = connectionStrokeWidth === opt.width
+              return (
+                <Pressable key={opt.key} onPress={() => onConnectionWidthChange?.(opt.width)}>
+                  <YStack
+                    width={28}
+                    height={28}
+                    borderRadius={14}
+                    alignItems="center"
+                    justifyContent="center"
+                    backgroundColor={isActive ? '$backgroundTinted' : 'transparent'}
+                    borderWidth={isActive ? 1 : 0}
+                    borderColor="$accentColor"
+                  >
+                    <YStack
+                      width={opt.display}
+                      height={opt.display}
+                      borderRadius={opt.display / 2}
+                      backgroundColor={selectedColor as any}
+                    />
+                  </YStack>
+                </Pressable>
+              )
+            })}
+          </XStack>
+        ) : textSelected ? (
           /* Text formatting controls */
           <XStack gap="$3" alignItems="center">
             {/* Font size control group */}
@@ -244,35 +289,86 @@ export function DrawingToolbar({
       {/* Second row: undo/redo on left + selection info + actions on right */}
       <XStack justifyContent="space-between" alignItems="center">
         <XStack gap="$1" alignItems="center">
-          <Pressable onPress={onUndo} disabled={!canUndo}>
-            <YStack
-              width={36}
-              height={36}
-              borderRadius={18}
-              alignItems="center"
-              justifyContent="center"
-              opacity={canUndo ? 1 : 0.3}
-            >
-              <Undo size={20} color={iconColorStrong} />
-            </YStack>
-          </Pressable>
-          <Pressable onPress={onRedo} disabled={!canRedo}>
-            <YStack
-              width={36}
-              height={36}
-              borderRadius={18}
-              alignItems="center"
-              justifyContent="center"
-              opacity={canRedo ? 1 : 0.3}
-            >
-              <Redo size={20} color={iconColorStrong} />
-            </YStack>
-          </Pressable>
+          {connectionSelected ? (
+            /* Arrow direction controls — plain icons, no backgrounds */
+            <>
+              <XStack
+                backgroundColor="$backgroundTinted"
+                borderRadius="$3"
+                alignItems="center"
+                height={36}
+                overflow="hidden"
+              >
+                <Pressable onPress={onConnectionArrowStartToggle}>
+                  <YStack
+                    width={38}
+                    height={36}
+                    alignItems="center"
+                    justifyContent="center"
+                    backgroundColor={connectionArrowStart ? '$accentColor' : 'transparent'}
+                  >
+                    <Ionicons name="arrow-back" size={18} color={connectionArrowStart ? '#000000' : iconColorStrong} />
+                  </YStack>
+                </Pressable>
+                <YStack width={1} height={20} backgroundColor="$borderColor" />
+                <Pressable onPress={onConnectionArrowNone}>
+                  <YStack
+                    width={38}
+                    height={36}
+                    alignItems="center"
+                    justifyContent="center"
+                    backgroundColor={!connectionArrowStart && !connectionArrowEnd ? '$accentColor' : 'transparent'}
+                  >
+                    <Ionicons name="remove-outline" size={18} color={!connectionArrowStart && !connectionArrowEnd ? '#000000' : iconColorStrong} />
+                  </YStack>
+                </Pressable>
+                <YStack width={1} height={20} backgroundColor="$borderColor" />
+                <Pressable onPress={onConnectionArrowEndToggle}>
+                  <YStack
+                    width={38}
+                    height={36}
+                    alignItems="center"
+                    justifyContent="center"
+                    backgroundColor={connectionArrowEnd ? '$accentColor' : 'transparent'}
+                  >
+                    <Ionicons name="arrow-forward" size={18} color={connectionArrowEnd ? '#000000' : iconColorStrong} />
+                  </YStack>
+                </Pressable>
+              </XStack>
+            </>
+          ) : (
+            <>
+              <Pressable onPress={onUndo} disabled={!canUndo}>
+                <YStack
+                  width={36}
+                  height={36}
+                  borderRadius={18}
+                  alignItems="center"
+                  justifyContent="center"
+                  opacity={canUndo ? 1 : 0.3}
+                >
+                  <Undo size={20} color={iconColorStrong} />
+                </YStack>
+              </Pressable>
+              <Pressable onPress={onRedo} disabled={!canRedo}>
+                <YStack
+                  width={36}
+                  height={36}
+                  borderRadius={18}
+                  alignItems="center"
+                  justifyContent="center"
+                  opacity={canRedo ? 1 : 0.3}
+                >
+                  <Redo size={20} color={iconColorStrong} />
+                </YStack>
+              </Pressable>
 
-          {selectionCount > 0 && (
-            <Text color="$colorSubtle" fontSize={12} marginLeft="$1">
-              {selectionCount} selected
-            </Text>
+              {selectionCount > 0 && (
+                <Text color="$colorSubtle" fontSize={12} marginLeft="$1">
+                  {selectionCount} selected
+                </Text>
+              )}
+            </>
           )}
         </XStack>
 

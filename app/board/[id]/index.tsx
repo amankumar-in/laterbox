@@ -47,6 +47,7 @@ import {
     useBoardItems,
     useBoardStrokes,
     useCreateBoardConnection,
+    useUpdateBoardConnection,
     useCreateBoardItem,
     useCreateBoardStroke,
     useDeleteBoardConnection,
@@ -94,6 +95,7 @@ export default function BoardScreen() {
   const updateStroke = useUpdateBoardStroke(id || '')
   const deleteStroke = useDeleteBoardStroke(id || '')
   const createConnection = useCreateBoardConnection(id || '')
+  const updateConnection = useUpdateBoardConnection(id || '')
   const deleteConnection = useDeleteBoardConnection(id || '')
   const { saveViewport } = useSaveViewport(id || '')
   const groupItems = useGroupItems(id || '')
@@ -413,10 +415,20 @@ export default function BoardScreen() {
     setJsScale(scale.value)
   }, [])
 
+  const multiTouchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearMultiTouchDelayed = useCallback(() => {
+    if (multiTouchTimerRef.current) clearTimeout(multiTouchTimerRef.current)
+    multiTouchTimerRef.current = setTimeout(() => {
+      isMultiTouch.value = false
+    }, 300)
+  }, [])
+
   // ── Gesture handlers ──────────────────────────────────
 
   // Track whether pinch is active so pan can compensate
   const isPinching = useSharedValue(false)
+  // Track multi-touch to suppress accidental taps during 2-finger pan/pinch
+  const isMultiTouch = useSharedValue(false)
   const pinchFocalX = useSharedValue(0)
   const pinchFocalY = useSharedValue(0)
 
@@ -424,6 +436,7 @@ export default function BoardScreen() {
   const panGesture = Gesture.Pan()
     .minPointers(2)
     .onStart(() => {
+      isMultiTouch.value = true
       savedTranslateX.value = translateX.value
       savedTranslateY.value = translateY.value
     })
@@ -438,10 +451,15 @@ export default function BoardScreen() {
       runOnJS(syncTransformToJS)()
       runOnJS(saveViewport)({ x: translateX.value, y: translateY.value, zoom: scale.value })
     })
+    .onFinalize(() => {
+      // Delay clear — one finger may lift before the other, residual lift could trigger tap
+      runOnJS(clearMultiTouchDelayed)()
+    })
 
   // Pinch zoom — zooms toward focal point so content stays under fingers
   const pinchGesture = Gesture.Pinch()
     .onStart((e) => {
+      isMultiTouch.value = true
       savedScale.value = scale.value
       savedTranslateX.value = translateX.value
       savedTranslateY.value = translateY.value
@@ -463,6 +481,9 @@ export default function BoardScreen() {
       isPinching.value = false
       runOnJS(syncTransformToJS)()
       runOnJS(saveViewport)({ x: translateX.value, y: translateY.value, zoom: scale.value })
+    })
+    .onFinalize(() => {
+      runOnJS(clearMultiTouchDelayed)()
     })
 
   // ── Draw gesture helpers (called via runOnJS) ──────────
@@ -745,8 +766,9 @@ export default function BoardScreen() {
 
   // Tap gesture — coord conversion done in JS via handleTap
   const tapGesture = Gesture.Tap()
+    .maxDuration(250)
     .onEnd((e) => {
-      if (e.numberOfPointers > 1) return
+      if (isMultiTouch.value) return
       runOnJS(handleTapFromGesture)(e.x, e.y)
     })
 
@@ -851,6 +873,35 @@ export default function BoardScreen() {
     const dx = px - closestX
     const dy = py - closestY
     return Math.sqrt(dx * dx + dy * dy)
+  }
+
+  /** Find a connection line near the given canvas coordinates */
+  function findConnectionAtPosition(cx: number, cy: number): BoardConnection | null {
+    const HIT_TOLERANCE = 20 // canvas-space pixels
+    for (let i = connections.length - 1; i >= 0; i--) {
+      const conn = connections[i]
+      const fromItem = items.find((it) => it.id === conn.fromItemId)
+      const toItem = items.find((it) => it.id === conn.toItemId)
+      if (!fromItem || !toItem) continue
+
+      // Get edge midpoints in canvas space
+      const from = getCanvasEdgeMidpoint(fromItem, conn.fromSide)
+      const to = getCanvasEdgeMidpoint(toItem, conn.toSide)
+
+      const dist = pointToSegmentDist(cx, cy, from, to)
+      if (dist <= HIT_TOLERANCE) return conn
+    }
+    return null
+  }
+
+  function getCanvasEdgeMidpoint(item: BoardItem, side: string): { x: number; y: number } {
+    switch (side) {
+      case 'top': return { x: item.x + item.width / 2, y: item.y }
+      case 'bottom': return { x: item.x + item.width / 2, y: item.y + item.height }
+      case 'left': return { x: item.x, y: item.y + item.height / 2 }
+      case 'right': return { x: item.x + item.width, y: item.y + item.height / 2 }
+      default: return { x: item.x + item.width / 2, y: item.y + item.height / 2 }
+    }
   }
 
   const HANDLE_HIT_SIZE = 28 // touch target for handles
@@ -1043,6 +1094,16 @@ export default function BoardScreen() {
       return
     }
 
+    // Check for connection line hit
+    const hitConn = findConnectionAtPosition(canvasX, canvasY)
+    if (hitConn) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+      clearSelection()
+      setSelectedConnectionIds(new Set([hitConn.id]))
+      setFlyMenu({ visible: false, x: 0, y: 0 })
+      return
+    }
+
     // Nothing hit — deselect
     clearSelection()
     setFlyMenu({ visible: false, x: 0, y: 0 })
@@ -1120,6 +1181,7 @@ export default function BoardScreen() {
               fromItemId: newFrom, toItemId: newTo,
               fromSide: conn.fromSide, toSide: conn.toSide,
               color: conn.color, strokeWidth: conn.strokeWidth,
+              arrowStart: conn.arrowStart, arrowEnd: conn.arrowEnd,
             })
           }
         }
@@ -1560,6 +1622,38 @@ export default function BoardScreen() {
     const newWeight = selectedTextItem.fontWeight === 'bold' ? 'normal' : 'bold'
     updateItem.mutate({ id: selectedTextItem.id, data: { fontWeight: newWeight } })
   }, [selectedTextItem, updateItem])
+
+  // ── Selected connection (for toolbar connection controls) ──────
+  const selectedConnection = useMemo(() => {
+    if (selectedConnectionIds.size !== 1) return null
+    const connId = Array.from(selectedConnectionIds)[0]
+    return connections.find((c) => c.id === connId) ?? null
+  }, [selectedConnectionIds, connections])
+
+  const handleConnectionArrowStartToggle = useCallback(() => {
+    if (!selectedConnection) return
+    updateConnection.mutate({ id: selectedConnection.id, data: { arrowStart: !selectedConnection.arrowStart } })
+  }, [selectedConnection, updateConnection])
+
+  const handleConnectionArrowEndToggle = useCallback(() => {
+    if (!selectedConnection) return
+    updateConnection.mutate({ id: selectedConnection.id, data: { arrowEnd: !selectedConnection.arrowEnd } })
+  }, [selectedConnection, updateConnection])
+
+  const handleConnectionArrowNone = useCallback(() => {
+    if (!selectedConnection) return
+    updateConnection.mutate({ id: selectedConnection.id, data: { arrowStart: false, arrowEnd: false } })
+  }, [selectedConnection, updateConnection])
+
+  const handleConnectionWidthChange = useCallback((width: number) => {
+    if (!selectedConnection) return
+    updateConnection.mutate({ id: selectedConnection.id, data: { strokeWidth: width } })
+  }, [selectedConnection, updateConnection])
+
+  const handleConnectionColorChange = useCallback((color: string) => {
+    if (!selectedConnection) return
+    updateConnection.mutate({ id: selectedConnection.id, data: { color } })
+  }, [selectedConnection, updateConnection])
 
   // ── Delete selected ──────────────────────────────────
 
@@ -2086,8 +2180,12 @@ export default function BoardScreen() {
           selectedWidth={drawWidth}
           onColorChange={(c) => {
             setDrawColor(c)
+            // Update selected connection color
+            if (selectedConnection) {
+              handleConnectionColorChange(c)
+            }
             // Also update the selected item's color (and fill for shapes)
-            if (selectedItemIds.size === 1) {
+            else if (selectedItemIds.size === 1) {
               const singleId = Array.from(selectedItemIds)[0]
               const selectedItem = items.find((i) => i.id === singleId)
               const data: Record<string, any> = { strokeColor: c }
@@ -2130,6 +2228,14 @@ export default function BoardScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
             setIsMarqueeMode((prev) => !prev)
           }}
+          connectionSelected={!!selectedConnection}
+          connectionArrowStart={selectedConnection?.arrowStart}
+          connectionArrowEnd={selectedConnection?.arrowEnd}
+          connectionStrokeWidth={selectedConnection?.strokeWidth}
+          onConnectionArrowStartToggle={handleConnectionArrowStartToggle}
+          onConnectionArrowEndToggle={handleConnectionArrowEndToggle}
+          onConnectionArrowNone={handleConnectionArrowNone}
+          onConnectionWidthChange={handleConnectionWidthChange}
         />
       </View>
     </YStack>

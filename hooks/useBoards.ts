@@ -13,6 +13,7 @@ import type {
   UpdateBoardItemInput,
   CreateBoardStrokeInput,
   CreateBoardConnectionInput,
+  UpdateBoardConnectionInput,
 } from '@/services/database/types'
 import { useCallback, useRef } from 'react'
 
@@ -245,7 +246,7 @@ export function useUpdateBoardConnection(boardId: string) {
   const { schedulePush } = useSyncService()
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { fromSide?: string; toSide?: string; color?: string } }) =>
+    mutationFn: ({ id, data }: { id: string; data: UpdateBoardConnectionInput }) =>
       repo.updateConnection(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['board-connections', boardId] })
