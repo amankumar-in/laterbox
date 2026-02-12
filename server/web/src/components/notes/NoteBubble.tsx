@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import {
   ChevronDown,
+  Download,
   Star,
   Pin,
   Lock,
@@ -49,8 +50,30 @@ export function NoteBubble({ note }: NoteBubbleProps) {
     setIsEditing(false)
   }
 
+  const handleDownload = async () => {
+    if (!note.attachment?.url) return
+    try {
+      const res = await fetch(note.attachment.url)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = note.attachment.filename || 'download'
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      // Fallback: open in new tab
+      window.open(note.attachment.url, '_blank')
+    }
+  }
+
   const menuItems = [
     { label: 'Copy', icon: <Copy size={14} />, onClick: handleCopy },
+    ...(note.attachment?.url
+      ? [{ label: 'Download', icon: <Download size={14} />, onClick: handleDownload }]
+      : []),
     ...(note.type === 'text'
       ? [
           {
@@ -111,7 +134,7 @@ export function NoteBubble({ note }: NoteBubbleProps) {
   return (
     <div className="group my-1 flex justify-end">
       <div className="relative max-w-[65%] rounded-lg bg-[#005c4b] shadow-sm">
-        <div className="px-2 pb-1 pt-1.5">
+        <div className="pb-1 pl-2 pr-4.5 pt-1.5">
           {renderNoteContent(note, isEditing, editContent, setEditContent, handleSaveEdit, setShowImage)}
         </div>
 
@@ -133,7 +156,7 @@ export function NoteBubble({ note }: NoteBubbleProps) {
         <button
           ref={menuRef}
           onClick={() => setShowMenu(!showMenu)}
-          className="absolute right-1 top-1 rounded p-0.5 text-[#ffffff80] opacity-0 transition-opacity hover:bg-[#ffffff15] group-hover:opacity-100"
+          className="absolute right-1 top-1 rounded bg-[#005c4bcc] p-0.5 text-[#ffffffcc] opacity-0 shadow transition-opacity hover:bg-[#005c4b] group-hover:opacity-100"
         >
           <ChevronDown size={16} />
         </button>

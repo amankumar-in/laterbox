@@ -516,6 +516,105 @@ export default function ThreadScreen() {
     handleClearSelection()
   }, [selectedNotes, pinNoteMutation, handleClearSelection])
 
+  const handleSelectionShare = useCallback(async () => {
+    const fileNotes = selectedNotes.filter(n => n.attachment?.url)
+    if (fileNotes.length === 0) return
+    const { resolveAttachmentUri } = await import('../../../services/fileStorage')
+    const Sharing = await import('expo-sharing')
+    for (const note of fileNotes) {
+      if (note.attachment?.url) {
+        const uri = resolveAttachmentUri(note.attachment.url)
+        await Sharing.shareAsync(uri)
+      }
+    }
+    handleClearSelection()
+  }, [selectedNotes, handleClearSelection])
+
+  const handleSelectionDownload = useCallback(async () => {
+    const fileNotes = selectedNotes.filter(n => n.attachment?.url)
+    if (fileNotes.length === 0) return
+    const { resolveAttachmentUri } = await import('../../../services/fileStorage')
+    const MediaLibrary = await import('expo-media-library')
+
+    const mediaTypes = ['image', 'video', 'voice', 'audio']
+    const mediaNotes = fileNotes.filter(n => mediaTypes.includes(n.type))
+    const docNotes = fileNotes.filter(n => !mediaTypes.includes(n.type))
+    let savedCount = 0
+
+    // Images, videos, voice, audio → save to media library
+    if (mediaNotes.length > 0) {
+      const { status } = await MediaLibrary.requestPermissionsAsync()
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Allow access to save media files.')
+        return
+      }
+      for (const note of mediaNotes) {
+        if (note.attachment?.url) {
+          await MediaLibrary.saveToLibraryAsync(resolveAttachmentUri(note.attachment.url))
+          savedCount++
+        }
+      }
+    }
+
+    // Documents → SAF to Downloads/LaterBox on Android, share sheet on iOS
+    if (docNotes.length > 0) {
+      if (Platform.OS === 'android') {
+        const { StorageAccessFramework, EncodingType, readAsStringAsync, writeAsStringAsync } = await import('expo-file-system/legacy')
+        const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default
+        const DIR_KEY = 'laterbox_download_dir_uri'
+
+        let dirUri = await AsyncStorage.getItem(DIR_KEY)
+        if (!dirUri) {
+          const perms = await StorageAccessFramework.requestDirectoryPermissionsAsync()
+          if (!perms.granted) { handleClearSelection(); return }
+          // Create LaterBox subfolder inside the picked directory
+          dirUri = await StorageAccessFramework.makeDirectoryAsync(perms.directoryUri, 'LaterBox')
+          await AsyncStorage.setItem(DIR_KEY, dirUri)
+        }
+
+        for (const note of docNotes) {
+          if (note.attachment?.url) {
+            const uri = resolveAttachmentUri(note.attachment.url)
+            const filename = note.attachment.filename || 'file'
+            const mime = note.attachment.mimeType || 'application/octet-stream'
+            try {
+              const newUri = await StorageAccessFramework.createFileAsync(dirUri, filename, mime)
+              const content = await readAsStringAsync(uri, { encoding: EncodingType.Base64 })
+              await writeAsStringAsync(newUri, content, { encoding: EncodingType.Base64 })
+              savedCount++
+            } catch {
+              // Cached dir URI may be stale — clear and retry next time
+              await AsyncStorage.removeItem(DIR_KEY)
+              Alert.alert('Download Failed', 'Please try again.')
+              handleClearSelection()
+              return
+            }
+          }
+        }
+      } else {
+        const { File, Paths } = await import('expo-file-system')
+        const Sharing = await import('expo-sharing')
+        for (const note of docNotes) {
+          if (note.attachment?.url) {
+            const uri = resolveAttachmentUri(note.attachment.url)
+            const filename = note.attachment.filename || 'file'
+            const source = new File(uri)
+            const dest = new File(Paths.cache, filename)
+            if (dest.exists) dest.delete()
+            source.copy(dest)
+            await Sharing.shareAsync(dest.uri, { dialogTitle: 'Save to Files' })
+            savedCount++
+          }
+        }
+      }
+    }
+
+    if (savedCount > 0) {
+      Alert.alert('Saved', `${savedCount} file${savedCount > 1 ? 's' : ''} saved.`)
+    }
+    handleClearSelection()
+  }, [selectedNotes, handleClearSelection])
+
   const handleTaskToggle = useCallback((note: NoteWithDetails) => {
     if (!note.task.isCompleted) {
       completeTaskMutation.mutate(note.id)
@@ -711,10 +810,13 @@ export default function ThreadScreen() {
             onEdit={handleSelectionEdit}
             onStar={handleSelectionStar}
             onPin={handleSelectionPin}
+            onShare={handleSelectionShare}
+            onDownload={handleSelectionDownload}
             allLocked={selectedNotes.every(n => n.isLocked)}
             allStarred={selectedNotes.every(n => n.isStarred)}
             allTasks={selectedNotes.every(n => n.task?.isTask)}
             allPinned={selectedNotes.every(n => n.isPinned)}
+            allFiles={selectedNotes.every(n => n.type !== 'text')}
             canEdit={selectedNoteIds.size === 1}
           />
         ) : thread?.isSystemThread ? (

@@ -21,7 +21,7 @@ import {
   handleWebSocketMessage,
 } from './websocket/handler'
 import { setBroadcastFunction, clearBroadcastFunction, broadcastSessionExpired } from './websocket/eventBroadcaster'
-import { startChangeDetector, stopChangeDetector } from './websocket/changeDetector'
+import { startChangeDetector, stopChangeDetector, setOnChangeCallback } from './websocket/changeDetector'
 
 import type { EventSubscription } from 'expo-modules-core'
 
@@ -60,7 +60,7 @@ function randomPort(): number {
 /**
  * Start the local server and return session info for the QR code.
  */
-export async function startLocalServer(db: SQLiteDatabase, sessionToken?: string): Promise<{
+export async function startLocalServer(db: SQLiteDatabase, sessionToken?: string, onDataChange?: () => void): Promise<{
   token: string
   port: number
   ip: string
@@ -141,6 +141,7 @@ export async function startLocalServer(db: SQLiteDatabase, sessionToken?: string
   })
 
   // Start change detector for phone-side mutations
+  if (onDataChange) setOnChangeCallback(onDataChange)
   await startChangeDetector(db, baseUrl)
 
   // Start background persistence to keep server alive
@@ -175,6 +176,7 @@ export async function stopLocalServer(): Promise<void> {
   broadcastSessionExpired('Server stopped')
 
   // Stop change detector
+  setOnChangeCallback(null)
   stopChangeDetector()
 
   // Clear broadcast function

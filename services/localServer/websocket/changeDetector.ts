@@ -21,11 +21,16 @@ import { rewriteNoteUrls } from '../utils/rewriteUrls'
 let pollInterval: ReturnType<typeof setInterval> | null = null
 let lastCheckTimestamp: string = ''
 let baseUrl: string = ''
+let onChangeCallback: (() => void) | null = null
 
 // Track known IDs so we can detect creates vs updates
 let knownNoteIds: Set<string> = new Set()
 let knownThreadIds: Set<string> = new Set()
 let initialized = false
+
+export function setOnChangeCallback(cb: (() => void) | null): void {
+  onChangeCallback = cb
+}
 
 export async function startChangeDetector(
   db: SQLiteDatabase,
@@ -130,6 +135,10 @@ async function pollForChanges(db: SQLiteDatabase): Promise<void> {
         broadcastThreadUpdated(thread)
       }
     }
+  }
+
+  if (changedNotes.length > 0 || changedThreads.length > 0) {
+    onChangeCallback?.()
   }
 
   lastCheckTimestamp = now

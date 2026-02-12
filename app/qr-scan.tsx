@@ -3,6 +3,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera'
 import { useRouter } from 'expo-router'
 import { useCallback, useRef, useState } from 'react'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui'
 import { useDb } from '@/contexts/DatabaseContext'
 import { startLocalServer } from '@/services/localServer'
@@ -20,6 +21,7 @@ export default function QRScanScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const db = useDb()
+  const queryClient = useQueryClient()
   const [permission, requestPermission] = useCameraPermissions()
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,7 +53,10 @@ export default function QRScanScreen() {
         }
 
         // Start local server with the QR token so browser can authenticate
-        const serverInfo = await startLocalServer(db, payload.token)
+        const serverInfo = await startLocalServer(db, payload.token, () => {
+          queryClient.invalidateQueries({ queryKey: ['notes'] })
+          queryClient.invalidateQueries({ queryKey: ['threads'] })
+        })
 
         // Connect to signaling relay and send phone-ready
         const relayUrl = `${payload.relay}?sessionId=${payload.sessionId}&role=phone`

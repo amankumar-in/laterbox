@@ -43,10 +43,25 @@ export function Dropdown({ items, onClose, anchorRef }: DropdownProps) {
   const style: React.CSSProperties = {}
   if (anchorRef?.current) {
     const rect = anchorRef.current.getBoundingClientRect()
+    const menuWidth = 160
+    const menuHeight = 250 // estimated max height
     style.position = 'fixed'
-    style.top = rect.bottom + 4
-    style.right = window.innerWidth - rect.right
     style.zIndex = 50
+
+    // Vertical: prefer below, flip above if not enough space
+    if (rect.bottom + 4 + menuHeight > window.innerHeight) {
+      style.bottom = window.innerHeight - rect.top + 4
+    } else {
+      style.top = rect.bottom + 4
+    }
+
+    // Horizontal: prefer right-aligned, flip to left-aligned if off-screen
+    const rightOffset = window.innerWidth - rect.right
+    if (rightOffset + menuWidth > window.innerWidth) {
+      style.left = Math.max(4, rect.left)
+    } else {
+      style.right = Math.max(4, rightOffset)
+    }
   }
 
   return (

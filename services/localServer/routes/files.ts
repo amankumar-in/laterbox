@@ -47,7 +47,7 @@ export function registerFileRoutes(
   // GET /api/files/* - Serve attachment files
   // This route returns a special response that tells the server to stream the file
   router.get('/api/files/*', async (req) => {
-    const relativePath = req.path.replace('/api/files/', '')
+    const relativePath = decodeURIComponent(req.path.replace('/api/files/', ''))
     if (!relativePath) {
       return router.json(400, { error: 'File path is required' })
     }
@@ -58,10 +58,13 @@ export function registerFileRoutes(
     }
 
     try {
+      console.log(`[LocalServer] File request — relativePath: "${relativePath}"`)
       const fullUri = resolveAttachmentUri(relativePath)
       const mimeType = getMimeType(relativePath)
       // Native sendFileResponse expects a plain filesystem path, not a file:// URI
-      const filePath = fullUri.startsWith('file://') ? fullUri.slice(7) : fullUri
+      const filePath = fullUri.startsWith('file://') ? decodeURIComponent(fullUri.slice(7)) : fullUri
+      console.log(`[LocalServer] File resolved — fullUri: "${fullUri}", filePath: "${filePath}"`)
+
 
       // Use native file response for efficient streaming
       sendFileResponse(req.id, 200, {

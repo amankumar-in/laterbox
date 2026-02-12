@@ -13,10 +13,13 @@ interface SelectionActionBarProps {
   onEdit: () => void
   onStar: () => void
   onPin: () => void
+  onShare?: () => void
+  onDownload?: () => void
   allLocked: boolean
   allStarred: boolean
   allTasks: boolean
   allPinned: boolean
+  allFiles: boolean
   canEdit: boolean
 }
 
@@ -41,10 +44,13 @@ export function SelectionActionBar({
   onEdit,
   onStar,
   onPin,
+  onShare,
+  onDownload,
   allLocked,
   allStarred,
   allTasks,
   allPinned,
+  allFiles,
   canEdit,
 }: SelectionActionBarProps) {
   const { iconColorStrong } = useThemeColor()
@@ -52,8 +58,8 @@ export function SelectionActionBar({
   return (
     <XStack
       backgroundColor="$backgroundStrong"
-      paddingHorizontal="$3"
-      paddingVertical="$3"
+      paddingHorizontal="$2"
+      paddingVertical="$2"
       alignItems="center"
       borderTopWidth={1}
       borderTopColor="$borderColor"
@@ -65,7 +71,7 @@ export function SelectionActionBar({
           circular
           chromeless
           onPress={onClose}
-          icon={<Ionicons name="close-outline" size={24} color={iconColorStrong} />}
+          icon={<Ionicons name="close-outline" size={22} color={iconColorStrong} />}
         />
         <Text fontSize="$4" fontWeight="600" color="$color">
           {selectedCount}
@@ -73,24 +79,60 @@ export function SelectionActionBar({
       </XStack>
 
       {/* Actions — fill remaining space, spread evenly */}
-      <XStack flex={1} alignItems="center" justifyContent="flex-end" gap="$2">
-        <Button
-          size="$3"
-          circular
-          chromeless
-          onPress={onCopy}
-          icon={<Ionicons name="copy-outline" size={20} color="#6366F1" />}
-        />
-        <Separator />
-        <Button
-          size="$3"
-          circular
-          chromeless
-          onPress={onEdit}
-          disabled={!canEdit}
-          opacity={canEdit ? 1 : 0.3}
-          icon={<SquarePen size={20} color="#3B82F6" />}
-        />
+      <XStack flex={1} alignItems="center" justifyContent="flex-end" gap={5}>
+        {allFiles ? (
+          <>
+            <Button
+              size="$3"
+              circular
+              chromeless
+              onPress={onShare}
+              icon={<Ionicons name="share-outline" size={20} color="#6366F1" />}
+            />
+            <Separator />
+            <Button
+              size="$3"
+              circular
+              chromeless
+              onPress={onDownload}
+              icon={<Ionicons name="download-outline" size={20} color="#3B82F6" />}
+            />
+          </>
+        ) : (
+          <>
+            <Button
+              size="$3"
+              circular
+              chromeless
+              onPress={onCopy}
+              icon={<Ionicons name="copy-outline" size={20} color="#6366F1" />}
+            />
+            <Separator />
+            <Button
+              size="$3"
+              circular
+              chromeless
+              onPress={onEdit}
+              disabled={!canEdit}
+              opacity={canEdit ? 1 : 0.3}
+              icon={<SquarePen size={20} color="#3B82F6" />}
+            />
+            <Separator />
+            <Button
+              size="$3"
+              circular
+              chromeless
+              onPress={onTask}
+              icon={
+                <Ionicons
+                  name={allTasks ? 'alarm' : 'alarm-outline'}
+                  size={20}
+                  color="#8B5CF6"
+                />
+              }
+            />
+          </>
+        )}
         <Separator />
         <Button
           size="$3"
@@ -106,20 +148,6 @@ export function SelectionActionBar({
           chromeless
           onPress={onPin}
           icon={<Ionicons name={allPinned ? 'pin' : 'pin-outline'} size={20} color="#F97316" />}
-        />
-        <Separator />
-        <Button
-          size="$3"
-          circular
-          chromeless
-          onPress={onTask}
-          icon={
-            <Ionicons
-              name={allTasks ? 'alarm' : 'alarm-outline'}
-              size={20}
-              color="#8B5CF6"
-            />
-          }
         />
         <Separator />
         <Button

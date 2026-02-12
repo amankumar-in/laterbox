@@ -56,14 +56,20 @@ export function useDeleteNote() {
 
 export function useUploadFile() {
   return useMutation({
-    mutationFn: (file: File) => {
-      const formData = new FormData()
-      formData.append('file', file)
-      return apiClient
-        .post('/api/files/upload', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
-        .then((r) => r.data)
+    mutationFn: async (file: File) => {
+      const buffer = await file.arrayBuffer()
+      const bytes = new Uint8Array(buffer)
+      let binary = ''
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i])
+      }
+      const base64 = btoa(binary)
+      const res = await apiClient.post('/api/files/upload', {
+        data: base64,
+        filename: file.name,
+        mimeType: file.type || 'application/octet-stream',
+      })
+      return res.data.attachment
     },
   })
 }

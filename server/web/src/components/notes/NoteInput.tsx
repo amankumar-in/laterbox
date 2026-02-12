@@ -64,22 +64,23 @@ export function NoteInput({ threadId, onSent }: NoteInputProps) {
     const noteType = getTypeFromMime(file.type)
     try {
       const result = await uploadFile.mutateAsync(file)
-      createNote.mutate(
+      console.log('[NoteInput] Upload result:', result)
+      await createNote.mutateAsync(
         {
           threadId,
           type: noteType,
           content: noteType === 'file' ? file.name : undefined,
           attachment: {
             url: result.url,
-            filename: file.name,
-            mimeType: file.type,
-            size: file.size,
+            filename: result.filename || file.name,
+            mimeType: result.mimeType || file.type,
+            size: result.size || file.size,
           },
         },
-        { onSuccess: onSent },
       )
-    } catch {
-      // Upload failed silently
+      onSent()
+    } catch (err) {
+      console.error('[NoteInput] File upload/create error:', err)
     }
   }
 

@@ -3,6 +3,7 @@ import { Image } from 'expo-image'
 import { useCallback, useMemo, useState } from 'react'
 import { Alert, Linking, Pressable, View } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import { runOnJS } from 'react-native-reanimated'
 import FileViewer from 'react-native-file-viewer'
 import { Text, XStack, YStack } from 'tamagui'
 import { useNoteFontScale } from '../../contexts/FontScaleContext'
@@ -128,6 +129,7 @@ function VoiceWaveform({
   audioDurationMs,
   onAudioToggle,
   onAudioSeek,
+  onLongPress,
   scaledFontSize,
   contentColor,
   iconColor,
@@ -142,6 +144,7 @@ function VoiceWaveform({
   audioDurationMs: number
   onAudioToggle?: (noteId: string, uri: string) => void
   onAudioSeek?: (noteId: string, positionMs: number) => void
+  onLongPress?: () => void
   scaledFontSize: number
   contentColor: string
   iconColor: string
@@ -198,33 +201,35 @@ function VoiceWaveform({
   }, [isThisActive, audioDurationMs, containerWidth, note.id, onAudioSeek])
 
   const panGesture = Gesture.Pan()
-    .onUpdate((e) => seekToX(e.x))
+    .onUpdate((e) => { runOnJS(seekToX)(e.x) })
     .minDistance(0)
     .activeOffsetX([-5, 5])
 
   const tapGesture = Gesture.Tap()
-    .onEnd((e) => seekToX(e.x))
+    .onEnd((e) => { runOnJS(seekToX)(e.x) })
 
   const composedGesture = Gesture.Simultaneous(tapGesture, panGesture)
 
   return (
     <YStack>
-      <Pressable onPress={() => {
-        if (note.attachment?.url) {
-          onAudioToggle?.(note.id, resolveAttachmentUri(note.attachment.url))
-        }
-      }}>
+      <Pressable onLongPress={onLongPress}>
         <XStack alignItems="center" gap="$2">
-          <XStack
-            width={36}
-            height={36}
-            borderRadius={18}
-            backgroundColor={background}
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Ionicons name={isThisPlaying ? 'pause' : 'play'} size={20} color={accentColor} />
-          </XStack>
+          <Pressable onPress={() => {
+            if (note.attachment?.url) {
+              onAudioToggle?.(note.id, resolveAttachmentUri(note.attachment.url))
+            }
+          }}>
+            <XStack
+              width={36}
+              height={36}
+              borderRadius={18}
+              backgroundColor={background}
+              alignItems="center"
+              justifyContent="center"
+            >
+              <Ionicons name={isThisPlaying ? 'pause' : 'play'} size={20} color={accentColor} />
+            </XStack>
+          </Pressable>
           <YStack flex={1} gap="$1">
             {resampledWaveform && resampledWaveform.length > 0 ? (
               <GestureDetector gesture={composedGesture}>
@@ -322,7 +327,7 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
         return (
           <YStack>
             {note.attachment?.url && imageExists ? (
-              <Pressable onPress={() => {
+              <Pressable onLongPress={handleLongPress} onPress={() => {
                 if (note.attachment?.url) {
                   onImageView?.(resolveAttachmentUri(note.attachment.url))
                 }
@@ -363,7 +368,7 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
             {note.attachment?.url && !videoExists ? (
               <MissingFile icon="videocam-outline" label="Video unavailable" iconColor={iconColor} />
             ) : (
-              <Pressable onPress={() => {
+              <Pressable onLongPress={handleLongPress} onPress={() => {
                 if (note.attachment?.url) {
                   onVideoView?.(resolveAttachmentUri(note.attachment.url))
                 }
@@ -443,6 +448,7 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
             audioDurationMs={audioDurationMs}
             onAudioToggle={onAudioToggle}
             onAudioSeek={onAudioSeek}
+            onLongPress={handleLongPress}
             scaledFontSize={scaledFontSize}
             contentColor={contentColor}
             iconColor={iconColor}
@@ -465,7 +471,7 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
           )
         }
         return (
-          <Pressable onPress={() => note.attachment?.url && openDocument(note.attachment.url)}>
+          <Pressable onLongPress={handleLongPress} onPress={() => note.attachment?.url && openDocument(note.attachment.url)}>
             <XStack alignItems="center" gap="$2">
               <XStack
                 width={40}
@@ -492,7 +498,7 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
 
       case 'location':
         return (
-          <Pressable onPress={() => openInMaps(note.location)}>
+          <Pressable onLongPress={handleLongPress} onPress={() => openInMaps(note.location)}>
             <YStack>
               <XStack
                 backgroundColor="$backgroundStrong"
@@ -553,22 +559,24 @@ export function NoteBubble({ note, onLongPress, onPress, onTaskToggle, onImageVi
         }
         const isThisPlaying = playingNoteId === note.id && isAudioPlaying
         return (
-          <Pressable onPress={() => {
-            if (note.attachment?.url) {
-              onAudioToggle?.(note.id, resolveAttachmentUri(note.attachment.url))
-            }
-          }}>
+          <Pressable onLongPress={handleLongPress}>
             <XStack alignItems="center" gap="$2">
-              <XStack
-                width={36}
-                height={36}
-                borderRadius={18}
-                backgroundColor="$pink5"
-                alignItems="center"
-                justifyContent="center"
-              >
-                <Ionicons name={isThisPlaying ? 'pause' : 'musical-notes'} size={20} color={iconColor} />
-              </XStack>
+              <Pressable onPress={() => {
+                if (note.attachment?.url) {
+                  onAudioToggle?.(note.id, resolveAttachmentUri(note.attachment.url))
+                }
+              }}>
+                <XStack
+                  width={36}
+                  height={36}
+                  borderRadius={18}
+                  backgroundColor="$pink5"
+                  alignItems="center"
+                  justifyContent="center"
+                >
+                  <Ionicons name={isThisPlaying ? 'pause' : 'musical-notes'} size={20} color={iconColor} />
+                </XStack>
+              </Pressable>
               <YStack flex={1}>
                 <Text fontSize="$3" fontWeight="500" numberOfLines={1} color={contentColor}>
                   {note.attachment?.filename || 'Audio'}
