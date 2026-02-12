@@ -7,11 +7,13 @@ import { useWallpaper } from '../../contexts/WallpaperContext'
 interface ThreadActionBarProps {
   selectedCount: number
   onClose: () => void
-  onPin: () => void
+  onPin?: () => void
+  onLock?: () => void
   onExport: () => void
   onShortcut: () => void
   onDelete: () => void
-  allPinned: boolean
+  allPinned?: boolean
+  allLocked?: boolean
   hideDelete?: boolean
 }
 
@@ -30,10 +32,12 @@ export function ThreadActionBar({
   selectedCount,
   onClose,
   onPin,
+  onLock,
   onExport,
   onShortcut,
   onDelete,
   allPinned,
+  allLocked,
   hideDelete,
 }: ThreadActionBarProps) {
   const { iconColorStrong, warningColor, accentColor, errorColor, backgroundStrong } = useThemeColor()
@@ -65,20 +69,42 @@ export function ThreadActionBar({
       </XStack>
 
       <XStack alignItems="center" gap="$3">
-        <Button
-          size="$3"
-          circular
-          chromeless
-          onPress={onPin}
-          icon={
-            <Ionicons
-              name={allPinned ? 'bookmark' : 'bookmark-outline'}
-              size={20}
-              color={warningColor}
+        {onPin && (
+          <>
+            <Button
+              size="$3"
+              circular
+              chromeless
+              onPress={onPin}
+              icon={
+                <Ionicons
+                  name={allPinned ? 'bookmark' : 'bookmark-outline'}
+                  size={20}
+                  color={warningColor}
+                />
+              }
             />
-          }
-        />
-        <Separator />
+            <Separator />
+          </>
+        )}
+        {onLock && (
+          <>
+            <Button
+              size="$3"
+              circular
+              chromeless
+              onPress={onLock}
+              icon={
+                <Ionicons
+                  name={allLocked ? 'lock-open-outline' : 'lock-closed-outline'}
+                  size={20}
+                  color={accentColor}
+                />
+              }
+            />
+            <Separator />
+          </>
+        )}
         <Button
           size="$3"
           circular

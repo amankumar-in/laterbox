@@ -36,7 +36,7 @@ import {
 } from '../hooks/useThreads'
 import { useUser } from '../hooks/useUser'
 import { useThreadViewStyle } from '../contexts/ThreadViewContext'
-import { useBoards, useCreateBoard, useDeleteBoard } from '../hooks/useBoards'
+import { useBoards, useCreateBoard, useDeleteBoard, useUpdateBoard } from '../hooks/useBoards'
 import type { Board, ThreadFilter, ThreadWithLastNote } from '../types'
 
 const FILTER_OPTIONS = [
@@ -67,8 +67,10 @@ function ThreadListHome() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedFilter, setSelectedFilter] = useState<ThreadFilter>('threads')
   const [selectedThreadIds, setSelectedThreadIds] = useState<Set<string>>(new Set())
+  const [selectedBoardIds, setSelectedBoardIds] = useState<Set<string>>(new Set())
 
   const isSelectionMode = selectedThreadIds.size > 0
+  const isBoardSelectionMode = selectedBoardIds.size > 0
 
   // Back button closes open swipe row first, then exits selection mode
   useEffect(() => {
@@ -78,10 +80,14 @@ function ThreadListHome() {
         setSelectedThreadIds(new Set())
         return true
       }
+      if (isBoardSelectionMode) {
+        setSelectedBoardIds(new Set())
+        return true
+      }
       return false
     })
     return () => handler.remove()
-  }, [isSelectionMode, swipeController])
+  }, [isSelectionMode, isBoardSelectionMode, swipeController])
 
   // API hooks — fetch all once, filter client-side
   const {
@@ -103,6 +109,7 @@ function ThreadListHome() {
   // Board hooks
   const { data: allBoards = [], isLoading: boardsLoading } = useBoards()
   const createBoard = useCreateBoard()
+  const updateBoard = useUpdateBoard()
   const deleteBoardMutation = useDeleteBoard()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [undoState, setUndoState] = useState<{
@@ -136,13 +143,32 @@ function ThreadListHome() {
     [selectedThreads]
   )
 
+  const allLocked = useMemo(
+    () => selectedThreads.length > 0 && selectedThreads.every((t) => t.isLocked),
+    [selectedThreads]
+  )
+
   const hasSystemThread = useMemo(
     () => selectedThreads.some((t) => t.isSystemThread),
     [selectedThreads]
   )
 
+  const selectedBoards = useMemo(
+    () => boards.filter((b) => selectedBoardIds.has(b.id)),
+    [boards, selectedBoardIds]
+  )
+
+  const allBoardsLocked = useMemo(
+    () => selectedBoards.length > 0 && selectedBoards.every((b) => b.isLocked),
+    [selectedBoards]
+  )
+
   const handleClearSelection = useCallback(() => {
     setSelectedThreadIds(new Set())
+  }, [])
+
+  const handleClearBoardSelection = useCallback(() => {
+    setSelectedBoardIds(new Set())
   }, [])
 
   const toggleThreadSelection = useCallback((threadId: string) => {
@@ -152,6 +178,18 @@ function ThreadListHome() {
         next.delete(threadId)
       } else {
         next.add(threadId)
+      }
+      return next
+    })
+  }, [])
+
+  const toggleBoardSelection = useCallback((boardId: string) => {
+    setSelectedBoardIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(boardId)) {
+        next.delete(boardId)
+      } else {
+        next.add(boardId)
       }
       return next
     })
@@ -208,6 +246,17 @@ function ThreadListHome() {
     })
     handleClearSelection()
   }, [selectedThreads, allPinned, updateThread, handleClearSelection])
+
+  const handleLockSelected = useCallback(() => {
+    const shouldLock = !allLocked
+    selectedThreads.forEach((thread) => {
+      updateThread.mutate({
+        id: thread.id,
+        data: { isLocked: shouldLock },
+      })
+    })
+    handleClearSelection()
+  }, [selectedThreads, allLocked, updateThread, handleClearSelection])
 
   const handleExportSelected = useCallback(async () => {
     if (selectedThreads.length !== 1) {
@@ -277,24 +326,110 @@ function ThreadListHome() {
     }
   }, [createBoard, router])
 
-  const handleBoardPress = useCallback((board: Board) => {
+  const handleBoardPress = useCallback(async (board: Board) => {
+    if (isBoardSelectionMode) {
+      toggleBoardSelection(board.id)
+      return
+    }
+    if (board.isLocked) {
+      try {
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: `Unlock "${board.name}"`,
+          fallbackLabel: 'Cancel',
+        })
+        if (!result.success) return
+      } catch {
+        return
+      }
+    }
     router.push(`/board/${board.id}`)
-  }, [router])
+  }, [router, isBoardSelectionMode, toggleBoardSelection])
 
   const handleBoardLongPress = useCallback((board: Board) => {
+    if (!isBoardSelectionMode) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+      setSelectedBoardIds(new Set([board.id]))
+    }
+  }, [isBoardSelectionMode])
+
+  const handleBoardPinToggle = useCallback((_board: Board) => {
+    // Board pin not yet in schema — no-op for now
+  }, [])
+
+  const handlePinSelectedBoards = useCallback(() => {
+    // Board pin not yet in schema — no-op for now
+  }, [])
+
+  const handleLockSelectedBoards = useCallback(() => {
+    const shouldLock = !allBoardsLocked
+    selectedBoards.forEach((board) => {
+      updateBoard.mutate({
+        id: board.id,
+        data: { isLocked: shouldLock },
+      })
+    })
+    handleClearBoardSelection()
+  }, [selectedBoards, allBoardsLocked, updateBoard, handleClearBoardSelection])
+
+  const handleExportSelectedBoards = useCallback(() => {
+    Alert.alert('Export', 'Board export is not available yet.')
+  }, [])
+
+  const handleShortcutSelectedBoards = useCallback(async () => {
+    if (selectedBoards.length !== 1) {
+      Alert.alert('Shortcut', 'Select a single board to add a shortcut.')
+      return
+    }
+    const board = selectedBoards[0]
+    try {
+      const Shortcuts = (await import('@rn-org/react-native-shortcuts')).default
+      const isSupported = await Shortcuts.isShortcutSupported()
+      if (!isSupported) {
+        Alert.alert('Not Supported', 'Shortcuts are not supported on this device.')
+        handleClearBoardSelection()
+        return
+      }
+      const exists = await Shortcuts.isShortcutExists(board.id)
+      const shortcutData = {
+        id: board.id,
+        title: board.name,
+        longLabel: board.name,
+        subTitle: 'Open board',
+        iconName: 'splashscreen_logo',
+        symbolName: 'rectangle.on.rectangle',
+      }
+      if (exists) {
+        await Shortcuts.updateShortcut(shortcutData)
+      } else {
+        await Shortcuts.addShortcut(shortcutData)
+      }
+      Alert.alert('Shortcut Added', `${board.name} added to shortcuts.`)
+    } catch {
+      Alert.alert('Failed', 'Could not add shortcut.')
+    }
+    handleClearBoardSelection()
+  }, [selectedBoards, handleClearBoardSelection])
+
+  const handleDeleteSelectedBoards = useCallback(() => {
+    const count = selectedBoards.length
     Alert.alert(
-      board.name,
-      undefined,
+      'Delete Board' + (count > 1 ? 's' : ''),
+      `Are you sure you want to delete ${count} board${count > 1 ? 's' : ''}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => deleteBoardMutation.mutate(board.id),
+          onPress: () => {
+            selectedBoards.forEach((board) => {
+              deleteBoardMutation.mutate(board.id)
+            })
+            handleClearBoardSelection()
+          },
         },
       ]
     )
-  }, [deleteBoardMutation])
+  }, [selectedBoards, deleteBoardMutation, handleClearBoardSelection])
 
   const handleQRPress = useCallback(() => {
     router.push('/qr-scan')
@@ -341,38 +476,61 @@ function ThreadListHome() {
     return results
   }, [searchQuery, boards, threads])
 
-  const renderBoardRow = useCallback((item: Board) => (
+  const renderBoardRow = useCallback((item: Board, isSelected: boolean) => (
     <XStack
       paddingHorizontal="$4"
       paddingVertical="$3"
       gap="$3"
       alignItems="center"
-      pressStyle={{ backgroundColor: '$backgroundHover' }}
-      onPress={() => handleBoardPress(item)}
-      onLongPress={() => handleBoardLongPress(item)}
+      backgroundColor={isSelected ? '$yellow4' : 'transparent'}
     >
-      <XStack
-        width={48}
-        height={48}
-        borderRadius={12}
-        backgroundColor="$brandBackground"
-        alignItems="center"
-        justifyContent="center"
-      >
-        {item.icon ? (
-          <Text fontSize={24}>{item.icon}</Text>
-        ) : (
-          <Ionicons name="easel-outline" size={24} color={iconColorStrong} />
+      <XStack width={48} height={48} position="relative">
+        <XStack
+          width={48}
+          height={48}
+          borderRadius={12}
+          backgroundColor="$brandBackground"
+          alignItems="center"
+          justifyContent="center"
+        >
+          {item.icon ? (
+            <Text fontSize={24}>{item.icon}</Text>
+          ) : (
+            <Ionicons name="easel-outline" size={24} color={iconColorStrong} />
+          )}
+        </XStack>
+        {isSelected && (
+          <XStack
+            position="absolute"
+            top={0}
+            left={0}
+            width={48}
+            height={48}
+            borderRadius={12}
+            backgroundColor="$accentColor"
+            opacity={0.85}
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Ionicons name="checkmark" size={24} color="#fff" />
+          </XStack>
         )}
       </XStack>
       <YStack flex={1}>
         <Text fontSize="$4" fontWeight="500" color="$color" numberOfLines={1}>
           {item.name}
         </Text>
-        <Text fontSize="$2" color="$colorSubtle">Board</Text>
+        <XStack alignItems="center" gap="$2">
+          <Text fontSize="$2" color="$colorSubtle">
+            {item.isLocked ? 'Locked Board' : 'Board'}
+          </Text>
+          {item.isLocked && (
+            <Ionicons name="lock-closed" size={12} color={warningColor} />
+          )}
+        </XStack>
       </YStack>
     </XStack>
-  ), [handleBoardPress, handleBoardLongPress, iconColorStrong])
+  ), [iconColorStrong, warningColor])
 
   // Render content based on state
   const renderContent = () => {
@@ -438,7 +596,7 @@ function ThreadListHome() {
             keyExtractor={(item) => item.data.id}
             renderItem={({ item }) =>
               item.type === 'board' ? (
-                renderBoardRow(item.data)
+                renderBoardRow(item.data, false)
               ) : (
                 <ThreadListItem
                   thread={item.data}
@@ -485,16 +643,53 @@ function ThreadListHome() {
       }
       return (
         <>
-          <FlatList
-            data={boards}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => renderBoardRow(item)}
-            ItemSeparatorComponent={() => (
-              <View style={{ height: StyleSheet.hairlineWidth, marginLeft: 76, backgroundColor: 'rgba(128,128,128,0.2)' }} />
-            )}
-            contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
-          />
-          <FAB icon="add" onPress={handleCreateBoard} disabled={createBoard.isPending} />
+          <SwipeableRowProvider controller={swipeController}>
+            <FlatList
+              data={boards}
+              keyExtractor={(item) => item.id}
+              onTouchStart={() => swipeController.closeAll()}
+              onScroll={() => swipeController.closeAll()}
+              scrollEventThrottle={16}
+              renderItem={({ item }) => (
+                <SwipeableRow
+                  rowId={item.id}
+                  enabled={!isBoardSelectionMode}
+                  onPress={() => handleBoardPress(item)}
+                  onLongPress={() => handleBoardLongPress(item)}
+                  onSwipeRight={() => handleBoardPinToggle(item)}
+                  onSwipeLeft={() => deleteBoardMutation.mutate(item.id)}
+                  onFullSwipeRight={() => handleBoardPinToggle(item)}
+                  onFullSwipeLeft={() => deleteBoardMutation.mutate(item.id)}
+                  leftIcon="bookmark"
+                  leftLabel="Pin"
+                  rightIcon="trash"
+                  rightLabel="Delete"
+                >
+                  {renderBoardRow(item, selectedBoardIds.has(item.id))}
+                </SwipeableRow>
+              )}
+              ItemSeparatorComponent={() => (
+                <View style={{ height: StyleSheet.hairlineWidth, marginLeft: 76, backgroundColor: 'rgba(128,128,128,0.2)' }} />
+              )}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+            />
+          </SwipeableRowProvider>
+
+          {isBoardSelectionMode ? (
+            <ThreadActionBar
+              selectedCount={selectedBoardIds.size}
+              onClose={handleClearBoardSelection}
+              onPin={handlePinSelectedBoards}
+              onLock={handleLockSelectedBoards}
+              onExport={handleExportSelectedBoards}
+              onShortcut={handleShortcutSelectedBoards}
+              onDelete={handleDeleteSelectedBoards}
+              allPinned={false}
+              allLocked={allBoardsLocked}
+            />
+          ) : (
+            <FAB icon="add" onPress={handleCreateBoard} disabled={createBoard.isPending} />
+          )}
         </>
       )
     }
@@ -601,10 +796,12 @@ function ThreadListHome() {
             selectedCount={selectedThreadIds.size}
             onClose={handleClearSelection}
             onPin={handlePinSelected}
+            onLock={handleLockSelected}
             onExport={handleExportSelected}
             onShortcut={handleShortcutSelected}
             onDelete={handleDeleteSelected}
             allPinned={allPinned}
+            allLocked={allLocked}
             hideDelete={hasSystemThread}
           />
         ) : (

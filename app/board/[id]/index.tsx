@@ -1721,7 +1721,7 @@ export default function BoardScreen() {
     if (router.canGoBack()) {
       router.back()
     }
-    return false
+    return true
   }, [router, editingTextId, flyMenu.visible, isMarqueeMode, hasSelection, clearSelection])
 
   // Android hardware back button

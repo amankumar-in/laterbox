@@ -252,8 +252,7 @@ export function SwipeableRow({
 
   const longPressGesture = Gesture.LongPress()
     .minDuration(500)
-    .onEnd((_e, success) => {
-      if (!success) return
+    .onStart(() => {
       if (Math.abs(translateX.value) <= 2 && onLongPress) {
         runOnJS(handleLongPress)()
       }
@@ -300,7 +299,11 @@ export function SwipeableRow({
     translateX.value = withSpring(0, SPRING_CONFIG)
   }, [onSwipeLeft, onSwipeRight, translateX])
 
-  if (!enabled) return <>{children}</>
+  if (!enabled) return (
+    <Pressable onPress={onPress ? handlePress : undefined} onLongPress={onLongPress ? handleLongPress : undefined}>
+      {children}
+    </Pressable>
+  )
 
   return (
     <GestureDetector gesture={composedGesture}>
