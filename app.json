@@ -20,7 +20,12 @@
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": ["audio"],
+        "NSCameraUsageDescription": "LaterBox uses the camera to take photos and videos to save as notes, and to scan QR codes for connecting to LaterBox Web.",
+        "NSPhotoLibraryUsageDescription": "LaterBox accesses your photo library to attach images and videos to your notes, and to save downloaded media from your notes.",
+        "NSMicrophoneUsageDescription": "LaterBox uses the microphone to record voice notes and capture audio in video recordings.",
+        "NSContactsUsageDescription": "LaterBox accesses your contacts so you can share contact cards as notes.",
+        "NSLocationWhenInUseUsageDescription": "LaterBox uses your location to save your current position as a location note."
       }
     },
     "android": {

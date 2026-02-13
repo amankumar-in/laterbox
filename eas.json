@@ -20,7 +20,8 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://laterbox-server.onrender.com/api"
+        "EXPO_PUBLIC_API_URL": "https://laterbox-server.onrender.com/api",
+        "GRADLE_OPTS": "-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g"
       }
     }
   },
