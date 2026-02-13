@@ -529,6 +529,7 @@ function ThreadListHome() {
   }, [])
 
   const handleWebPress = useCallback(() => {
+    console.log('[DEBUG] handleWebPress fired, serverRunning:', serverRunning)
     if (serverRunning) {
       router.push('/web-session')
     } else {
@@ -965,7 +966,7 @@ function ThreadListHome() {
         rightIcons={[
           serverRunning
             ? { icon: <PulsingServerIcon />, onPress: handleWebPress }
-            : { icon: <MonitorSmartphone size={24} color={iconColorStrong} />, onPress: handleWebPress },
+            : { icon: <View pointerEvents="none"><MonitorSmartphone size={24} color={iconColorStrong} /></View>, onPress: handleWebPress },
           { name: 'settings-outline', onPress: handleSettingsPress },
         ]}
       />

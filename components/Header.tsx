@@ -71,7 +71,8 @@ export function Header({ title, leftIcon, rightIcon, rightIcons }: HeaderProps) 
             size="$3"
             circular
             chromeless
-            onPress={ri.onPress}
+            onPress={() => { console.log('[DEBUG] Header button pressed, index:', i); ri.onPress() }}
+            onPressIn={() => console.log('[DEBUG] Header button pressIn, index:', i)}
             icon={ri.icon ?? <Ionicons name={ri.name!} size={24} color={iconColorStrong} />}
           />
         ))}
